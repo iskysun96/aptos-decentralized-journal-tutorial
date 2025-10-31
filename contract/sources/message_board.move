@@ -1,70 +1,98 @@
-module message_board_addr::message_board {
+/*
+    Permanent Diary 
+    This is a permanent diary contract that allows users to post messages and read them.
+
+*/
+
+module permanent_diary_addr::permanent_diary {
     use std::string::String;
+    use aptos_framework::object::{Self, ExtendRef, Object};
+    use aptos_framework::big_ordered_map::{Self, BigOrderedMap};
+    use std::signer;
 
-    use aptos_framework::object::{Self, ExtendRef};
 
-    struct Message has key {
-        string_content: String,
+
+    struct Diaries has key {
+        all_diaries: BigOrderedMap<address, Object<Diary>>,
     }
 
-    const BOARD_OBJECT_SEED: vector<u8> = b"message_board";
-
-    struct BoardObjectController has key {
+    struct DiariesController has key {
         extend_ref: ExtendRef,
     }
 
-    // This function is only called once when the module is published for the first time.
-    // init_module is optional, you can also have an entry function as the initializer.
-    fun init_module(sender: &signer) {
-        let constructor_ref = &object::create_named_object(sender, BOARD_OBJECT_SEED);
-        move_to(&object::generate_signer(constructor_ref), BoardObjectController {
-            extend_ref: object::generate_extend_ref(constructor_ref),
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    struct Diary has key {
+        daily_entries: BigOrderedMap<u64, String>, //u64 should be the date in this format: YYYYMMDD
+    }
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    struct DiaryController has key {
+        extend_ref: ExtendRef,
+    }
+
+    const DIARY_OBJECT_SEED: vector<u8> = b"my_permanent_diary";
+    const DIARIES_OBJECT_SEED: vector<u8> = b"all_diaries";
+
+    fun init_module(_sender: &signer) {
+        let diaries_constructor_ref = &object::create_named_object(_sender, DIARIES_OBJECT_SEED);
+        let diaries_signer = object::generate_signer(diaries_constructor_ref);
+        move_to(&diaries_signer, Diaries {
+            all_diaries: big_ordered_map::new(),
+        });
+
+        move_to(&diaries_signer, DiariesController {
+            extend_ref: object::generate_extend_ref(diaries_constructor_ref),
         });
     }
 
     // ======================== Write functions ========================
 
-    public entry fun post_message(
+
+    entry fun add_daily_entry(
         _sender: &signer,
-        new_string_content: String,
-    ) acquires Message, BoardObjectController {
-        if (!exist_message()) {
-            let board_obj_signer = get_board_obj_signer();
-            move_to(&board_obj_signer, Message {
-                string_content: new_string_content,
-            });
+        date: u64,
+        content: String,
+    ) {
+        let sender_address = signer::address_of(_sender);
+        let diary_address = object::create_object_address(&sender_address, DIARY_OBJECT_SEED);
+
+        if (!object::object_exists(diary_address)) {
+            create_diary(_sender);
         };
-        let message = borrow_global_mut<Message>(get_board_obj_address());
-        message.string_content = new_string_content;
+
+        let diary_struct = Diary {
+            daily_entries: big_ordered_map::new()
+        };
+
+        diary_struct.daily_entries.add(date, content);
+
+        let diary_extend_ref = borrow_global<DiaryController>(diary_address).extend_ref;
+
+        move_to(&object::generate_signer_for_extending(&diary_extend_ref), diary_struct);
     }
+
 
     // ======================== Read Functions ========================
-
-    #[view]
-    public fun exist_message(): bool {
-        exists<Message>(get_board_obj_address())
-    }
-
-    #[view]
-    public fun get_message_content(): (String) acquires Message {
-        let message = borrow_global<Message>(get_board_obj_address());
-        message.string_content
-    }
+    
+    //TODO: get diary content by date
 
     // ======================== Helper functions ========================
 
-    fun get_board_obj_address(): address {
-        object::create_object_address(&@message_board_addr, BOARD_OBJECT_SEED)
+    fun create_diary(
+        _sender: &signer
+    ) {
+        let diary_controller = &object::create_named_object(_sender, DIARY_OBJECT_SEED);
+        let diary_address = object::address_from_constructor_ref(diary_controller);
+        move_to(&object::generate_signer(diary_controller), Diary {
+            daily_entries: big_ordered_map::new(),
+        });
+
+        let diaries_address = get_diaries_obj_address();
+        let diaries = borrow_global_mut<Diaries>(diaries_address);
+        diaries.all_diaries.add(signer::address_of(_sender), object::address_to_object(diary_address));
     }
 
-    fun get_board_obj_signer(): signer acquires BoardObjectController {
-        object::generate_signer_for_extending(&borrow_global<BoardObjectController>(get_board_obj_address()).extend_ref)
-    }
-
-    // ======================== Unit Tests ========================
-
-    #[test_only]
-    public fun init_module_for_test(sender: &signer) {
-        init_module(sender);
+    fun get_diaries_obj_address(): address {
+        object::create_object_address(&@message_board_addr, DIARIES_OBJECT_SEED)
     }
 }
