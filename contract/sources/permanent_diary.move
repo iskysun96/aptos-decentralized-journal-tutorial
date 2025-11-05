@@ -7,28 +7,31 @@
 module permanent_diary_addr::permanent_diary {
     use std::string::String;
     use aptos_framework::object::{Self, ExtendRef, Object};
-    use aptos_framework::big_ordered_map::{Self, BigOrderedMap};
+    use aptos_framework::smart_table::{Self, SmartTable};
     use std::signer;
     use std::option::{Self, Option};
 
     /// Global registry that maps user addresses to their diary objects
     struct Diaries has key {
-        all_diaries: BigOrderedMap<address, Object<Diary>>,
+        all_diaries: SmartTable<address, Object<Diary>>,
     }
 
-    /// Controller for the Diaries object, provides extend_ref for extending the object
     struct DiariesController has key {
         extend_ref: ExtendRef,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    struct DiariesRegistry has key {
+        publisher_address: address,
+    }
+
+
     /// Individual user diary containing daily entries
     /// Date format: YYYYMMDD (e.g., 20241031 for October 31, 2024)
     struct Diary has key {
-        daily_entries: BigOrderedMap<u64, String>,
+        daily_entries: SmartTable<u64, String>,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+
     /// Controller for individual diary objects, provides extend_ref for extending the object
     struct DiaryController has key {
         extend_ref: ExtendRef,
@@ -39,14 +42,17 @@ module permanent_diary_addr::permanent_diary {
     /// Seed for creating the global Diaries registry named object
     const DIARIES_OBJECT_SEED: vector<u8> = b"all_diaries";
 
-    /// Initializes the global Diaries registry and its controller
-    /// This should be called once when the module is published
-    fun init_module(_sender: &signer) {
-        let diaries_constructor_ref = &object::create_named_object(_sender, DIARIES_OBJECT_SEED);
+    fun init_module(sender: &signer) {
+        let publisher_addr = signer::address_of(sender);
+        move_to(sender, DiariesRegistry {
+            publisher_address: publisher_addr,
+        });
+
+        let diaries_constructor_ref = &object::create_named_object(sender, DIARIES_OBJECT_SEED);
         let diaries_signer = object::generate_signer(diaries_constructor_ref);
         
         move_to(&diaries_signer, Diaries {
-            all_diaries: big_ordered_map::new(),
+            all_diaries: smart_table::new(),
         });
 
         move_to(&diaries_signer, DiariesController {
@@ -66,7 +72,7 @@ module permanent_diary_addr::permanent_diary {
         sender: &signer,
         date: u64,
         content: String,
-    ) acquires Diary, Diaries {
+    ) acquires Diary, Diaries, DiariesRegistry {
         let sender_address = signer::address_of(sender);
         let diary_address = object::create_object_address(&sender_address, DIARY_OBJECT_SEED);
 
@@ -77,6 +83,9 @@ module permanent_diary_addr::permanent_diary {
 
         // Get the diary and add the entry
         let diary = borrow_global_mut<Diary>(diary_address);
+        if (diary.daily_entries.contains(date)) {
+            diary.daily_entries.remove(date);
+        };
         diary.daily_entries.add(date, content);
     }
 
@@ -92,8 +101,12 @@ module permanent_diary_addr::permanent_diary {
         };
 
         // Get the diary and return the content
-        let diary = &Diary[diary_address];
-        diary.daily_entries.get(&date)
+        let diary = borrow_global<Diary>(diary_address);
+        if (smart_table::contains(&diary.daily_entries, date)) {
+            option::some(*smart_table::borrow(&diary.daily_entries, date))
+        } else {
+            option::none()
+        }
     }
 
     // ======================== Helper functions ========================
@@ -102,14 +115,14 @@ module permanent_diary_addr::permanent_diary {
     /// Also creates the DiaryController for extending the diary object
     fun create_diary(
         sender: &signer
-    ) acquires Diaries {
+    ) acquires Diaries, DiariesRegistry {
         let diary_controller = &object::create_named_object(sender, DIARY_OBJECT_SEED);
         let diary_address = object::address_from_constructor_ref(diary_controller);
         let diary_signer = object::generate_signer(diary_controller);
         
         // Create the Diary resource
         move_to(&diary_signer, Diary {
-            daily_entries: big_ordered_map::new(),
+            daily_entries: smart_table::new(),
         });
 
         // Create the DiaryController for extending the object
@@ -119,12 +132,31 @@ module permanent_diary_addr::permanent_diary {
 
         // Register the diary in the global registry
         let diaries_address = get_diaries_obj_address();
+        // debug::print(&diaries_address);
         let diaries = borrow_global_mut<Diaries>(diaries_address);
         diaries.all_diaries.add(signer::address_of(sender), object::address_to_object(diary_address));
     }
 
-    /// Returns the address of the global Diaries object
-    fun get_diaries_obj_address(): address {
-        object::create_object_address(&@permanent_diary_addr, DIARIES_OBJECT_SEED)
+    fun get_diaries_obj_address(): address acquires DiariesRegistry {
+        let registry = borrow_global<DiariesRegistry>(@permanent_diary_addr);
+        object::create_object_address(&registry.publisher_address, DIARIES_OBJECT_SEED)
+    }
+
+    // ======================== Test-only functions ========================
+
+    #[test_only]
+    /// Public test-only function to initialize the module
+    public fun init_module_for_test(sender: &signer) {
+        init_module(sender);
+    }
+
+    #[test_only]
+    /// Public test-only function wrapper for add_daily_entry
+    public fun add_daily_entry_for_test(
+        sender: &signer,
+        date: u64,
+        content: String,
+    ) acquires Diary, Diaries, DiariesRegistry {
+        add_daily_entry(sender, date, content);
     }
 }
