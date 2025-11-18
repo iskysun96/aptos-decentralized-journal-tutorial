@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { Header } from "@/components/Header";
-import Link from "next/link";
+import { TopBanner } from "@/components/TopBanner";
 
 export default function DiaryPage() {
   const { account, signAndSubmitTransaction, connected } = useWallet();
@@ -165,23 +165,15 @@ export default function DiaryPage() {
 
   return (
     <>
+      <TopBanner />
       <Header />
       <div className="flex items-center justify-center flex-col min-h-screen py-8">
         <Card className="w-full max-w-2xl">
           <CardHeader>
-            <div className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl">Permanent Diary</CardTitle>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Record your daily memory with one image and one message. Each entry is permanently stored on the Aptos blockchain.
-                </p>
-              </div>
-              {connected && (
-                <Button variant="outline" asChild>
-                  <Link href="/view">View My Entries</Link>
-                </Button>
-              )}
-            </div>
+            <CardTitle className="text-2xl">Permanent Diary</CardTitle>
+            <p className="text-sm text-muted-foreground mt-2">
+              Record your daily memory with one image and one message. Each entry is permanently stored on the Aptos blockchain.
+            </p>
           </CardHeader>
           <CardContent className="flex flex-col gap-6">
             {!connected ? (
@@ -275,3 +267,4 @@ export default function DiaryPage() {
     </>
   );
 }
+
