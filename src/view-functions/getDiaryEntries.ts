@@ -3,9 +3,8 @@ import { aptosClient } from "@/utils/aptosClient";
 import { getDiaryObjectAddressFromGraphQL } from "./getDiaryObjectAddressFromGraphQL";
 
 export type DiaryEntry = {
-  date: number; // YYYYMMDD format
+  unixTimestamp: number; // Unix timestamp in seconds
   content: string;
-  timestamp?: string;
 };
 
 // Get diary object address for a user (blockchain fallback)
@@ -24,14 +23,6 @@ const getDiaryObjectAddress = async (userAddress: string): Promise<string | null
   }
 };
 
-// Helper function to convert unix seconds (normalized to midnight) to YYYYMMDD format
-const unixSecondsToYYYYMMDD = (unixSeconds: number): number => {
-  const date = new Date(unixSeconds * 1000);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return parseInt(`${year}${month}${day}`, 10);
-};
 
 // Helper function to extract message from DiaryEntry enum
 // DiaryEntry::MessageOnly { message: String }
@@ -208,17 +199,15 @@ export const getDiaryEntries = async (userAddress: string): Promise<DiaryEntry[]
     for (const { key, value } of parsedEntries) {
       const message = extractMessageFromEntry(value);
       if (message !== null) {
-        const dateYYYYMMDD = unixSecondsToYYYYMMDD(key);
         diaryEntries.push({
-          date: dateYYYYMMDD,
+          unixTimestamp: key,
           content: message,
-          timestamp: new Date(key * 1000).toISOString(),
         });
       }
     }
 
-    // Sort by date (newest first)
-    diaryEntries.sort((a, b) => b.date - a.date);
+    // Sort by timestamp (newest first)
+    diaryEntries.sort((a, b) => b.unixTimestamp - a.unixTimestamp);
     
     return diaryEntries;
   } catch (error: any) {
