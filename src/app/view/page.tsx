@@ -46,10 +46,10 @@ export default function ViewDiaryPage() {
   const { account, connected } = useWallet();
 
   const { data: entries, isLoading, refetch } = useQuery({
-    queryKey: ["diary-entries", account?.address],
+    queryKey: ["diary-entries", account?.address?.toString()],
     queryFn: async () => {
       if (!account) return [];
-      return await getDiaryEntries(account.address.toStringLong());
+      return await getDiaryEntries(account.address.toString());
     },
     enabled: !!account && connected,
     refetchInterval: 10_000,
