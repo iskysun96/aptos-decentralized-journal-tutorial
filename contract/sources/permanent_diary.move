@@ -40,7 +40,7 @@ module permanent_diary_addr::permanent_diary {
         user_diary_object_address: address,
         user_address: address,
         date_in_unix_seconds: u64,
-        content: DiaryEntry,
+        content: String,
     }
 
 // you can extend more data types if you use Enum 
@@ -116,7 +116,7 @@ module permanent_diary_addr::permanent_diary {
             user_diary_object_address: *diary_addr,
             user_address: sender_address,
             date_in_unix_seconds,
-            content: diary_entry,
+            content,
         });
     }
 
@@ -253,7 +253,7 @@ module permanent_diary_addr::permanent_diary {
             user_diary_object_address: *diary_addr,
             user_address: sender_address,
             date_in_unix_seconds: date,
-            content: diary_entry,
+            content,
         });
     }
 }
