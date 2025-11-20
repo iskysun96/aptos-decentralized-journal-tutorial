@@ -96,7 +96,7 @@ module permanent_diary_addr::permanent_diary {
         // Validate content length
         let content_length = content.length();
         if (content_length > MAX_CONTENT_LENGTH) {
-            abort E_CONTENT_TOO_LONG
+            abort E_CONTENT_TOO_LONG;
         };
 
         let sender_address = signer::address_of(sender);

@@ -1,6 +1,6 @@
 import { MODULE_ADDRESS } from "@/constants";
 import { aptosClient } from "@/utils/aptosClient";
-import { getDiaryObjectAddressFromGraphQL } from "./getDiaryObjectAddressFromGraphQL";
+import { getDiaryObjectAddressFromGraphQL, type DiaryObjectAddressResult } from "./getDiaryObjectAddressFromGraphQL";
 
 export type DiaryEntry = {
   unixTimestamp: number; // Unix timestamp in seconds
@@ -8,7 +8,7 @@ export type DiaryEntry = {
 };
 
 // Get diary object address for a user (blockchain fallback)
-const getDiaryObjectAddress = async (userAddress: string): Promise<string | null> => {
+const getDiaryObjectAddress = async (userAddress: string): Promise<DiaryObjectAddressResult> => {
   try {
     const result = await aptosClient().view<[string | null]>({
       payload: {
@@ -16,10 +16,25 @@ const getDiaryObjectAddress = async (userAddress: string): Promise<string | null
         functionArguments: [userAddress],
       },
     });
-    return result[0];
-  } catch (error) {
-    console.error("Error getting diary object address:", error);
-    return null;
+    const address = result[0];
+    if (address) {
+      return {
+        address,
+        source: 'blockchain',
+      };
+    }
+    return {
+      address: null,
+      source: 'not_found',
+    };
+  } catch (error: any) {
+    const errorMessage = error?.message || String(error);
+    console.error("Error getting diary object address:", errorMessage);
+    return {
+      address: null,
+      source: 'not_found',
+      error: errorMessage,
+    };
   }
 };
 
@@ -57,8 +72,14 @@ const extractMessageFromEntry = (entry: any): string | null => {
 
 // Helper function to recursively extract entries from BPlusTreeMap nodes
 // Handles both leaf nodes and internal nodes
-const extractEntriesFromNode = (node: any): Array<{ key: number; value: any }> => {
+// maxDepth prevents stack overflow from deeply nested or malicious tree structures
+const extractEntriesFromNode = (node: any, currentDepth: number = 0, maxDepth: number = 20): Array<{ key: number; value: any }> => {
   const entries: Array<{ key: number; value: any }> = [];
+  
+  // Prevent stack overflow from excessive recursion
+  if (currentDepth > maxDepth) {
+    return entries;
+  }
   
   if (!node || typeof node !== "object") {
     return entries;
@@ -97,7 +118,7 @@ const extractEntriesFromNode = (node: any): Array<{ key: number; value: any }> =
       for (const entry of node.children.entries) {
         if (entry && typeof entry === "object" && "value" in entry) {
           // Recursively extract from child nodes
-          const childEntries = extractEntriesFromNode(entry.value);
+          const childEntries = extractEntriesFromNode(entry.value, currentDepth + 1, maxDepth);
           entries.push(...childEntries);
         }
       }
@@ -120,11 +141,11 @@ const parseBigOrderedMap = (mapData: any): Array<{ key: number; value: any }> =>
   // Check if it's a BPlusTreeMap structure
   if (mapData.__variant__ === "BPlusTreeMap" && mapData.root) {
     // Extract entries from the root node (recursively handles leaf and internal nodes)
-    const rootEntries = extractEntriesFromNode(mapData.root);
+    const rootEntries = extractEntriesFromNode(mapData.root, 0, 20);
     entries.push(...rootEntries);
   } else if (mapData.root) {
     // Try to extract even if __variant__ is not set
-    const rootEntries = extractEntriesFromNode(mapData.root);
+    const rootEntries = extractEntriesFromNode(mapData.root, 0, 20);
     entries.push(...rootEntries);
   } else {
     // Fallback: try other structures
@@ -152,18 +173,21 @@ export const getDiaryEntries = async (userAddress: string): Promise<DiaryEntry[]
   try {
     // First, try to get the diary object address from GraphQL (fast, indexed)
     // Fall back to blockchain view function if GraphQL fails
-    let diaryObjectAddress = await getDiaryObjectAddressFromGraphQL(userAddress);
-    console.log("Diary object address from GraphQL:", diaryObjectAddress);
+    let addressResult: DiaryObjectAddressResult = await getDiaryObjectAddressFromGraphQL(userAddress);
+    console.log("Diary object address from GraphQL:", addressResult);
     
     // Fallback to blockchain view function if GraphQL didn't return an address
-    if (!diaryObjectAddress) {
-      diaryObjectAddress = await getDiaryObjectAddress(userAddress);
-      console.log("Diary object address from blockchain:", diaryObjectAddress);
+    // Only fallback if GraphQL returned not_found (not if it had an error, as that might be transient)
+    if (addressResult.address === null && addressResult.source === 'not_found') {
+      addressResult = await getDiaryObjectAddress(userAddress);
+      console.log("Diary object address from blockchain:", addressResult);
     }
     
-    if (!diaryObjectAddress) {
+    if (!addressResult.address) {
       return [];
     }
+    
+    const diaryObjectAddress = addressResult.address;
 
     // Query the Diary resource from the object address
     if (!MODULE_ADDRESS) {
