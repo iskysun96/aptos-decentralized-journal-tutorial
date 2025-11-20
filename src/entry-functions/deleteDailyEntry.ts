@@ -16,6 +16,12 @@ export const deleteDailyEntry = (args: DeleteDailyEntryArguments): InputTransact
   if (unixTimestamp < 0) {
     throw new Error('unixTimestamp must be a positive number (cannot be before Unix epoch)');
   }
+
+  // Minimum reasonable timestamp: Jan 1, 2000 (946684800)
+  const minReasonableTimestamp = 946684800;
+  if (unixTimestamp < minReasonableTimestamp) {
+    throw new Error('unixTimestamp is unrealistically old (must be after Jan 1, 2000)');
+  }
   
   // Check if timestamp is not too far in the future (e.g., not more than 100 years from now)
   // 100 years = 100 * 365.25 * 24 * 60 * 60 seconds ≈ 3,155,760,000 seconds
