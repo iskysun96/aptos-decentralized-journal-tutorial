@@ -105,11 +105,11 @@ export function WalletSelector() {
   );
 }
 
-interface ConnectWalletDialogProps {
+export interface ConnectWalletDialogProps {
   close: () => void;
 }
 
-function ConnectWalletDialog({ close }: ConnectWalletDialogProps) {
+export function ConnectWalletDialog({ close }: ConnectWalletDialogProps) {
   const { wallets = [], notDetectedWallets = [] } = useWallet();
   const { aptosConnectWallets, availableWallets, installableWallets } = groupAndSortWallets([...wallets, ...notDetectedWallets]);
 
