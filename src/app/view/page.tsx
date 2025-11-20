@@ -148,11 +148,11 @@ export default function ViewDiaryPage() {
               </div>
             ) : (
               <div className="flex flex-col gap-6">
-                {entries.map((entry) => {
+                {entries.map((entry, index) => {
                   const parsed = parseContent(entry.content);
                   const isDeleting = deletingTimestamps.has(entry.unixTimestamp);
                   return (
-                    <Card key={entry.unixTimestamp} className="w-full">
+                    <Card key={`${entry.unixTimestamp}-${index}`} className="w-full">
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="text-lg">
                           {formatTimestamp(entry.unixTimestamp)}
