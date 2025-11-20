@@ -2,7 +2,7 @@ import { InputTransactionData } from "@aptos-labs/wallet-adapter-react";
 import { MODULE_ADDRESS } from "@/constants";
 
 export type AddDailyEntryArguments = {
-  content: string; // Combined content with image and message
+  content: string;
 };
 
 export const addDailyEntry = (args: AddDailyEntryArguments): InputTransactionData => {

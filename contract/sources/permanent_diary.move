@@ -22,13 +22,11 @@ module permanent_diary_addr::permanent_diary {
         all_diaries: BigOrderedMap<address, address>, // user address -> diary object address
     }
 
-
     /// Individual user diary containing daily entries
-    /// Date format: YYYYMMDD (e.g., 20241031 for October 31, 2024)
+    /// Entries are stored by unix timestamp (seconds)
     struct Diary has key {
         daily_entries: BigOrderedMap<u64, DiaryEntry>,
     }
-
 
     /// Controller for individual diary objects, provides extend_ref for extending the object
     struct DiaryController has key {
@@ -40,10 +38,17 @@ module permanent_diary_addr::permanent_diary {
         user_diary_object_address: address,
         user_address: address,
         date_in_unix_seconds: u64,
-        content: DiaryEntry,
+        content: String,
     }
 
-// you can extend more data types if you use Enum 
+    #[event]
+    struct DeleteDailyEntryEvent has drop, store {
+        user_diary_object_address: address,
+        user_address: address,
+        date_in_unix_seconds: u64,
+    }
+
+    /// Diary entry enum - can be extended with more data types in the future
     enum DiaryEntry has store, drop, copy {
         MessageOnly {
             message: String
@@ -51,8 +56,16 @@ module permanent_diary_addr::permanent_diary {
     }
 
     const DIARY_REGISTRY_OBJECT_SEED: vector<u8> = b"my_permanent_diary_registry";
-    const SECONDS_PER_DAY: u64 = 86400;
-
+    
+    /// Error code: Diary not found for the user
+    const E_DIARY_NOT_FOUND: u64 = 1;
+    /// Error code: Entry not found for the given timestamp
+    const E_ENTRY_NOT_FOUND: u64 = 2;
+    /// Error code: Content string exceeds maximum allowed length
+    const E_CONTENT_TOO_LONG: u64 = 3;
+    
+    /// Maximum length for diary entry content (in bytes)
+    const MAX_CONTENT_LENGTH: u64 = 10000;
 
     fun init_module(sender: &signer) {
         let diaries_reg_constructor_ref = &object::create_named_object(sender, DIARY_REGISTRY_OBJECT_SEED);
@@ -71,52 +84,69 @@ module permanent_diary_addr::permanent_diary {
 
     /// Adds a daily entry to the sender's diary
     /// Creates the diary if it doesn't exist for the sender
-    /// Automatically uses the current day's timestamp (normalized to midnight)
-    /// Allows updates within the same day, but entries become permanent after the day ends
+    /// Uses the current timestamp, allowing multiple entries per day
+    /// Users can add as many entries as they want
     /// 
     /// Args:
-    ///   - content: String content of the diary entry
+    ///   - content: String content of the diary entry (max length: MAX_CONTENT_LENGTH)
     entry fun add_daily_entry(
         sender: &signer,
         content: String,
     ) acquires Diary, DiariesRegistry {
-        let sender_address = signer::address_of(sender);
-
-        let diaries_reg_obj_addr = get_diaries_reg_obj_address();
-
-        // Check if diary exists first (with a borrow that we'll drop)
-        let diary_exists = {
-            let diaries_reg = borrow_global<DiariesRegistry>(diaries_reg_obj_addr);
-            diaries_reg.all_diaries.contains(&sender_address)
+        // Validate content length
+        let content_length = content.length();
+        if (content_length > MAX_CONTENT_LENGTH) {
+            abort E_CONTENT_TOO_LONG;
         };
 
+        let sender_address = signer::address_of(sender);
+        let diaries_reg_obj_addr = get_diaries_reg_obj_address();
+
         // Create diary if it doesn't exist
-        if (!diary_exists) {
+        if (!check_if_diary_exists(sender_address, diaries_reg_obj_addr)) {
             create_diary(sender);
         };
 
-        // Get current timestamp and normalize to start of day (midnight)
-        // This ensures all entries on the same day use the same key, allowing updates
-        // After the day is over, the normalized timestamp changes, making old entries permanent
         let now_seconds = timestamp::now_seconds();
-        let date_in_unix_seconds = (now_seconds / SECONDS_PER_DAY) * SECONDS_PER_DAY;
-
-        // Get the diary and add the entry
         let diaries_reg = borrow_global_mut<DiariesRegistry>(diaries_reg_obj_addr);
         let diary_addr = diaries_reg.all_diaries.borrow(&sender_address);
         let diary = borrow_global_mut<Diary>(*diary_addr);
-        if (diary.daily_entries.contains(&date_in_unix_seconds)) {
-            diary.daily_entries.remove(&date_in_unix_seconds);
-        };
-
         let diary_entry = DiaryEntry::MessageOnly { message: content };
-        diary.daily_entries.add(date_in_unix_seconds, diary_entry);
+        diary.daily_entries.add(now_seconds, diary_entry);
 
         event::emit(AddDailyEntryEvent {
             user_diary_object_address: *diary_addr,
             user_address: sender_address,
-            date_in_unix_seconds,
-            content: diary_entry,
+            date_in_unix_seconds: now_seconds,
+            content,
+        });
+    }
+
+    /// Deletes a daily entry from the sender's diary by unix timestamp
+    /// Only deletes if the entry exists
+    /// 
+    /// Args:
+    ///   - unix_timestamp: Unix timestamp (in seconds) of the entry to delete
+    entry fun delete_daily_entry_by_unixtimestamp(sender: &signer, unix_timestamp: u64) acquires Diary, DiariesRegistry {
+        let sender_address = signer::address_of(sender);
+        let diaries_reg_obj_addr = get_diaries_reg_obj_address();
+        
+        // Check if diary exists before borrowing
+        assert!(check_if_diary_exists(sender_address, diaries_reg_obj_addr), E_DIARY_NOT_FOUND);
+
+        let diaries_reg = borrow_global_mut<DiariesRegistry>(diaries_reg_obj_addr);
+        let diary_addr = diaries_reg.all_diaries.borrow(&sender_address);
+        let diary = borrow_global_mut<Diary>(*diary_addr);
+
+        // Check if entry exists before deletion
+        assert!(diary.daily_entries.contains(&unix_timestamp), E_ENTRY_NOT_FOUND);
+
+        diary.daily_entries.remove(&unix_timestamp);
+
+        event::emit(DeleteDailyEntryEvent {
+            user_diary_object_address: *diary_addr,
+            user_address: sender_address,
+            date_in_unix_seconds: unix_timestamp,
         });
     }
 
@@ -167,14 +197,14 @@ module permanent_diary_addr::permanent_diary {
         }
     }
 
+    /// Returns the address of the diaries registry object
     fun get_diaries_reg_obj_address(): address {
         object::create_object_address(&@permanent_diary_addr, DIARY_REGISTRY_OBJECT_SEED)
     }
 
     /// Helper function to extract message from DiaryEntry enum
+    /// Uses pattern matching to extract the message from the enum variant
     fun extract_message_from_entry(entry: DiaryEntry): String {
-        // Since DiaryEntry only has MessageOnly variant currently, we can directly extract
-        // In the future, if more variants are added, this would need pattern matching
         let DiaryEntry::MessageOnly { message } = entry;
         message
     }
@@ -201,12 +231,22 @@ module permanent_diary_addr::permanent_diary {
 
         // Register the diary in the global registry
         let diaries_reg_obj_addr = get_diaries_reg_obj_address();
-        // debug::print(&diaries_address);
         let diaries_reg = borrow_global_mut<DiariesRegistry>(diaries_reg_obj_addr);
         let sender_addr = signer::address_of(sender);
         diaries_reg.all_diaries.add(sender_addr, diary_addr);
     }
 
+    /// Checks if a diary exists for the given user address
+    /// 
+    /// Args:
+    ///   - sender_address: The user's address to check
+    ///   - diaries_reg_obj_addr: The address of the diaries registry object
+    /// Returns:
+    ///   - true if the diary exists, false otherwise
+    fun check_if_diary_exists(sender_address: address, diaries_reg_obj_addr: address): bool acquires DiariesRegistry {
+        let diaries_reg = borrow_global<DiariesRegistry>(diaries_reg_obj_addr);
+        diaries_reg.all_diaries.contains(&sender_address)
+    }
 
     // ======================== Test-only functions ========================
 
@@ -218,7 +258,7 @@ module permanent_diary_addr::permanent_diary {
 
     #[test_only]
     /// Public test-only function wrapper for add_daily_entry
-    /// Bypasses timestamp check for testing
+    /// Allows specifying a custom timestamp for testing
     public fun add_daily_entry_for_test(
         sender: &signer,
         date: u64,
@@ -227,14 +267,8 @@ module permanent_diary_addr::permanent_diary {
         let sender_address = signer::address_of(sender);
         let diaries_reg_obj_addr = get_diaries_reg_obj_address();
 
-        // Check if diary exists first (with a borrow that we'll drop)
-        let diary_exists = {
-            let diaries_reg = borrow_global<DiariesRegistry>(diaries_reg_obj_addr);
-            diaries_reg.all_diaries.contains(&sender_address)
-        };
-
         // Create diary if it doesn't exist
-        if (!diary_exists) {
+        if (!check_if_diary_exists(sender_address, diaries_reg_obj_addr)) {
             create_diary(sender);
         };
 
@@ -242,6 +276,8 @@ module permanent_diary_addr::permanent_diary {
         let diaries_reg = borrow_global_mut<DiariesRegistry>(diaries_reg_obj_addr);
         let diary_addr = diaries_reg.all_diaries.borrow(&sender_address);
         let diary = borrow_global_mut<Diary>(*diary_addr);
+        
+        // Remove existing entry if it exists (for test consistency)
         if (diary.daily_entries.contains(&date)) {
             diary.daily_entries.remove(&date);
         };
@@ -253,7 +289,7 @@ module permanent_diary_addr::permanent_diary {
             user_diary_object_address: *diary_addr,
             user_address: sender_address,
             date_in_unix_seconds: date,
-            content: diary_entry,
+            content,
         });
     }
 }

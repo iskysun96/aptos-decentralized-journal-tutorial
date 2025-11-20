@@ -1,14 +1,14 @@
 import { MODULE_ADDRESS } from "@/constants";
 import { aptosClient } from "@/utils/aptosClient";
+import { getDiaryObjectAddressFromGraphQL, type DiaryObjectAddressResult } from "./getDiaryObjectAddressFromGraphQL";
 
 export type DiaryEntry = {
-  date: number; // YYYYMMDD format
+  unixTimestamp: number; // Unix timestamp in seconds
   content: string;
-  timestamp?: string;
 };
 
-// Get diary object address for a user
-const getDiaryObjectAddress = async (userAddress: string): Promise<string | null> => {
+// Get diary object address for a user (blockchain fallback)
+const getDiaryObjectAddress = async (userAddress: string): Promise<DiaryObjectAddressResult> => {
   try {
     const result = await aptosClient().view<[string | null]>({
       payload: {
@@ -16,124 +16,232 @@ const getDiaryObjectAddress = async (userAddress: string): Promise<string | null
         functionArguments: [userAddress],
       },
     });
-    return result[0];
-  } catch (error) {
-    console.error("Error getting diary object address:", error);
-    return null;
+    const address = result[0];
+    if (address) {
+      return {
+        address,
+        source: 'blockchain',
+      };
+    }
+    return {
+      address: null,
+      source: 'not_found',
+    };
+  } catch (error: any) {
+    const errorMessage = error?.message || String(error);
+    console.error("Error getting diary object address:", errorMessage);
+    return {
+      address: null,
+      source: 'not_found',
+      error: errorMessage,
+    };
   }
 };
 
-// Helper function to add delay between requests
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const getDiaryEntries = async (userAddress: string): Promise<DiaryEntry[]> => {
-  try {
-    // First, get the diary object address
-    const diaryObjectAddress = await getDiaryObjectAddress(userAddress);
-    if (!diaryObjectAddress) {
-      return [];
+// Helper function to extract message from DiaryEntry enum
+// DiaryEntry::MessageOnly { message: String }
+// Structure: { __variant__: "MessageOnly", message: "..." }
+const extractMessageFromEntry = (entry: any): string | null => {
+  if (typeof entry === "string") {
+    return entry;
+  }
+  
+  if (typeof entry === "object" && entry !== null) {
+    // Check for MessageOnly variant with __variant__ field
+    if (entry.__variant__ === "MessageOnly" && "message" in entry) {
+      return entry.message;
     }
-
-    // Try to query events first (more efficient)
-    try {
-      // Query events from the diary object
-      // Events are stored on the object that emitted them
-      const events = await aptosClient().getEventsByEventHandle({
-        eventHandle: `${diaryObjectAddress}::permanent_diary::AddDailyEntryEvent`,
-      });
-
-      if (events && events.length > 0) {
-        const entries: DiaryEntry[] = events.map((event: any) => {
-          const data = event.data as {
-            user_diary_object_address: string;
-            user_address: string;
-            date: string;
-            content: string;
-          };
-
-          // Filter by user address to ensure we only get this user's entries
-          if (data.user_address.toLowerCase() === userAddress.toLowerCase()) {
-            return {
-              date: parseInt(data.date, 10),
-              content: data.content,
-              timestamp: event.sequence_number?.toString(),
-            };
-          }
-          return null;
-        }).filter((entry): entry is DiaryEntry => entry !== null);
-
-        // Sort by date (newest first)
-        entries.sort((a, b) => b.date - a.date);
-        return entries;
-      }
-    } catch (eventError) {
-      // If event querying fails, fall back to date-based querying
-      console.log("Event querying not available, falling back to date-based query");
-    }
-
-    // Fallback: Query recent dates (last 30 days only to avoid rate limits)
-    const today = new Date();
-    const entriesFound: DiaryEntry[] = [];
-    const daysToCheck = 30; // Reduced from 365 to avoid rate limits
-    const batchSize = 5; // Reduced batch size
-    const delayBetweenBatches = 500; // 500ms delay between batches
-
-    for (let batchStart = 0; batchStart < daysToCheck; batchStart += batchSize) {
-      const batchPromises = [];
-      
-      for (let i = batchStart; i < Math.min(batchStart + batchSize, daysToCheck); i++) {
-        const checkDate = new Date(today);
-        checkDate.setDate(checkDate.getDate() - i);
-        const year = checkDate.getFullYear();
-        const month = String(checkDate.getMonth() + 1).padStart(2, "0");
-        const day = String(checkDate.getDate()).padStart(2, "0");
-        const dateNum = parseInt(`${year}${month}${day}`, 10);
-        
-        batchPromises.push(
-          aptosClient()
-            .view<[string | null]>({
-              payload: {
-                function: `${MODULE_ADDRESS}::permanent_diary::get_diary_content_by_date`,
-                functionArguments: [userAddress, dateNum],
-              },
-            })
-            .then((content) => {
-              if (content[0] !== null) {
-                return {
-                  date: dateNum,
-                  content: content[0],
-                };
-              }
-              return null;
-            })
-            .catch(() => null)
-        );
-      }
-      
-      try {
-        const batchResults = await Promise.all(batchPromises);
-        const validEntries = batchResults.filter((entry) => entry !== null) as DiaryEntry[];
-        entriesFound.push(...validEntries);
-      } catch (batchError: any) {
-        // If we hit rate limits, stop querying
-        if (batchError?.status === 429 || batchError?.message?.includes("429")) {
-          console.warn("Rate limit hit, stopping queries");
-          break;
-        }
-      }
-      
-      // Add delay between batches to avoid rate limiting
-      if (batchStart + batchSize < daysToCheck) {
-        await delay(delayBetweenBatches);
+    
+    // Check for MessageOnly variant (nested structure)
+    if ("MessageOnly" in entry) {
+      const messageOnly = entry.MessageOnly;
+      if (typeof messageOnly === "object" && messageOnly !== null && "message" in messageOnly) {
+        return messageOnly.message;
       }
     }
     
-    // Sort by date (newest first)
-    entriesFound.sort((a, b) => b.date - a.date);
-    return entriesFound;
-  } catch (error) {
+    // Check if message is directly in the object
+    if ("message" in entry) {
+      return entry.message;
+    }
+  }
+  
+  return null;
+};
+
+// Helper function to recursively extract entries from BPlusTreeMap nodes
+// Handles both leaf nodes and internal nodes
+// maxDepth prevents stack overflow from deeply nested or malicious tree structures
+const extractEntriesFromNode = (node: any, currentDepth: number = 0, maxDepth: number = 20): Array<{ key: number; value: any }> => {
+  const entries: Array<{ key: number; value: any }> = [];
+  
+  // Prevent stack overflow from excessive recursion
+  if (currentDepth > maxDepth) {
+    return entries;
+  }
+  
+  if (!node || typeof node !== "object") {
+    return entries;
+  }
+  
+  // If it's a leaf node, extract entries directly
+  if (node.is_leaf === true && node.children) {
+    const children = node.children;
+    
+    // Check if children has entries (SortedVectorMap structure)
+    if (children.entries && Array.isArray(children.entries)) {
+      for (const entry of children.entries) {
+        if (entry && typeof entry === "object" && "key" in entry && "value" in entry) {
+          // Key is unix timestamp as string, convert to number
+          const key = typeof entry.key === "string" ? parseInt(entry.key, 10) : Number(entry.key);
+          
+          // Value structure: { __variant__: "Leaf", value: { __variant__: "MessageOnly", message: "..." } }
+          // Or: { __variant__: "MessageOnly", message: "..." }
+          // Extract the actual value (nested structure)
+          let actualValue = entry.value;
+          
+          // If value has a nested structure with Leaf variant, get the inner value
+          if (actualValue && typeof actualValue === "object" && actualValue.__variant__ === "Leaf" && actualValue.value) {
+            actualValue = actualValue.value;
+          }
+          
+          entries.push({ key, value: actualValue });
+        }
+      }
+    }
+  } else if (node.children && node.children.entries) {
+    // Internal node - recursively extract from children
+    // For internal nodes, we might need to traverse further, but for now
+    // if there are entries, process them
+    if (Array.isArray(node.children.entries)) {
+      for (const entry of node.children.entries) {
+        if (entry && typeof entry === "object" && "value" in entry) {
+          // Recursively extract from child nodes
+          const childEntries = extractEntriesFromNode(entry.value, currentDepth + 1, maxDepth);
+          entries.push(...childEntries);
+        }
+      }
+    }
+  }
+  
+  return entries;
+};
+
+// Helper function to parse BPlusTreeMap structure from Aptos resource
+// BPlusTreeMap is the underlying structure for BigOrderedMap
+const parseBigOrderedMap = (mapData: any): Array<{ key: number; value: any }> => {
+  const entries: Array<{ key: number; value: any }> = [];
+  
+  if (!mapData || typeof mapData !== "object") {
+    console.log("Map data is not an object");
+    return entries;
+  }
+  
+  // Check if it's a BPlusTreeMap structure
+  if (mapData.__variant__ === "BPlusTreeMap" && mapData.root) {
+    // Extract entries from the root node (recursively handles leaf and internal nodes)
+    const rootEntries = extractEntriesFromNode(mapData.root, 0, 20);
+    entries.push(...rootEntries);
+  } else if (mapData.root) {
+    // Try to extract even if __variant__ is not set
+    const rootEntries = extractEntriesFromNode(mapData.root, 0, 20);
+    entries.push(...rootEntries);
+  } else {
+    // Fallback: try other structures
+    if (Array.isArray(mapData)) {
+      // Direct array
+      for (const item of mapData) {
+        if (Array.isArray(item) && item.length >= 2) {
+          const key = typeof item[0] === "string" ? parseInt(item[0], 10) : Number(item[0]);
+          entries.push({ key, value: item[1] });
+        } else if (typeof item === "object" && item !== null && "key" in item && "value" in item) {
+          const key = typeof item.key === "string" ? parseInt(item.key, 10) : Number(item.key);
+          entries.push({ key, value: item.value });
+        }
+      }
+    } else if (mapData.handle) {
+      console.warn("BigOrderedMap is a table handle - cannot directly access all entries");
+      return entries;
+    }
+  }
+  
+  return entries;
+};
+
+export const getDiaryEntries = async (userAddress: string): Promise<DiaryEntry[]> => {
+  try {
+    // First, try to get the diary object address from GraphQL (fast, indexed)
+    // Fall back to blockchain view function if GraphQL fails
+    let addressResult: DiaryObjectAddressResult = await getDiaryObjectAddressFromGraphQL(userAddress);
+    console.log("Diary object address from GraphQL:", addressResult);
+    
+    // Fallback to blockchain view function if GraphQL didn't return an address
+    // Only fallback if GraphQL returned not_found (not if it had an error, as that might be transient)
+    if (addressResult.address === null && addressResult.source === 'not_found' && !addressResult.error) {
+      addressResult = await getDiaryObjectAddress(userAddress);
+      console.log("Diary object address from blockchain:", addressResult);
+    }
+    
+    if (!addressResult.address) {
+      return [];
+    }
+    
+    const diaryObjectAddress = addressResult.address;
+
+    // Query the Diary resource from the object address
+    if (!MODULE_ADDRESS) {
+      throw new Error("MODULE_ADDRESS is not defined");
+    }
+    const resourceType = `${MODULE_ADDRESS}::permanent_diary::Diary` as `${string}::${string}::${string}`;
+    const resource = await aptosClient().getAccountResource({
+      accountAddress: diaryObjectAddress,
+      resourceType,
+    });
+
+    console.log("Diary resource:", resource);
+
+    if (!resource) {
+      console.log("Diary resource not found or empty");
+      return [];
+    }
+
+    // Extract daily_entries BigOrderedMap from resource
+    // The structure is: resource.daily_entries (not resource.data.daily_entries)
+    const dailyEntries = resource.daily_entries;
+    if (!dailyEntries) {
+      console.log("No daily_entries found in Diary resource");
+      return [];
+    }
+
+    // Parse the BigOrderedMap structure
+    const parsedEntries = parseBigOrderedMap(dailyEntries);
+    console.log("Parsed entries:", parsedEntries);
+    
+    // Convert to DiaryEntry format
+    const diaryEntries: DiaryEntry[] = [];
+    for (const { key, value } of parsedEntries) {
+      const message = extractMessageFromEntry(value);
+      if (message !== null) {
+        diaryEntries.push({
+          unixTimestamp: key,
+          content: message,
+        });
+      }
+    }
+
+    // Sort by timestamp (newest first)
+    diaryEntries.sort((a, b) => b.unixTimestamp - a.unixTimestamp);
+    
+    return diaryEntries;
+  } catch (error: any) {
+    // Handle case where resource doesn't exist (404)
+    if (error?.status === 404 || error?.message?.includes("404") || error?.message?.includes("not found")) {
+      console.log("Diary resource not found at object address");
+      return [];
+    }
     console.error("Error fetching diary entries:", error);
-    return [];
+    throw error;
   }
 };
 

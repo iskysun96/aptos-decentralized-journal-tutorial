@@ -1,29 +1,28 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
 import { aptosClient } from "@/utils/aptosClient";
-import { getDiaryEntries, type DiaryEntry } from "@/view-functions/getDiaryEntries";
+import { getDiaryEntries } from "@/view-functions/getDiaryEntries";
+import { deleteDailyEntry } from "@/entry-functions/deleteDailyEntry";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/use-toast";
 import Link from "next/link";
 
-// Format date from YYYYMMDD to readable format
-const formatDate = (dateNum: number): string => {
-  const dateStr = dateNum.toString();
-  if (dateStr.length !== 8) return dateStr;
-  
-  const year = dateStr.substring(0, 4);
-  const month = dateStr.substring(4, 6);
-  const day = dateStr.substring(6, 8);
-  
-  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-  return date.toLocaleDateString("en-US", { 
+// Format unix timestamp to readable date and time
+const formatTimestamp = (unixTimestamp: number): string => {
+  const date = new Date(unixTimestamp * 1000);
+  return date.toLocaleString("en-US", { 
     year: "numeric", 
     month: "long", 
-    day: "numeric" 
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true
   });
 };
 
@@ -43,17 +42,63 @@ const parseContent = (content: string): { image?: string; message: string; times
 };
 
 export default function ViewDiaryPage() {
-  const { account, connected } = useWallet();
+  const { account, connected, signAndSubmitTransaction } = useWallet();
+  const [deletingTimestamps, setDeletingTimestamps] = useState<Set<number>>(new Set());
 
   const { data: entries, isLoading, refetch } = useQuery({
-    queryKey: ["diary-entries", account?.address],
+    queryKey: ["diary-entries", account?.address?.toString()],
     queryFn: async () => {
       if (!account) return [];
-      return await getDiaryEntries(account.address.toStringLong());
+      return await getDiaryEntries(account.address.toString());
     },
     enabled: !!account && connected,
-    refetchInterval: 10_000,
   });
+
+  const handleDelete = async (unixTimestamp: number) => {
+    if (!account) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please connect your wallet",
+      });
+      return;
+    }
+
+    setDeletingTimestamps((prev) => new Set(prev).add(unixTimestamp));
+
+    try {
+      const committedTransaction = await signAndSubmitTransaction(
+        deleteDailyEntry({
+          unixTimestamp,
+        })
+      );
+
+      const executedTransaction = await aptosClient().waitForTransaction({
+        transactionHash: committedTransaction.hash,
+      });
+
+      toast({
+        title: "Success",
+        description: `Diary entry deleted! Transaction hash: ${executedTransaction.hash}`,
+      });
+
+      // Refetch entries to update the list
+      await refetch();
+    } catch (error: any) {
+      console.error("Error deleting diary entry:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error?.message || "Failed to delete diary entry",
+      });
+    } finally {
+      setDeletingTimestamps((prev) => {
+        const next = new Set(prev);
+        next.delete(unixTimestamp);
+        return next;
+      });
+    }
+  };
 
   if (!connected) {
     return (
@@ -105,19 +150,28 @@ export default function ViewDiaryPage() {
               <div className="flex flex-col gap-6">
                 {entries.map((entry, index) => {
                   const parsed = parseContent(entry.content);
+                  const isDeleting = deletingTimestamps.has(entry.unixTimestamp);
                   return (
-                    <Card key={`${entry.date}-${index}`} className="w-full">
-                      <CardHeader>
+                    <Card key={`${entry.unixTimestamp}-${index}`} className="w-full">
+                      <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="text-lg">
-                          {formatDate(entry.date)}
+                          {formatTimestamp(entry.unixTimestamp)}
                         </CardTitle>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDelete(entry.unixTimestamp)}
+                          disabled={isDeleting}
+                        >
+                          {isDeleting ? "Deleting..." : "Delete"}
+                        </Button>
                       </CardHeader>
                       <CardContent className="flex flex-col gap-4">
                         {parsed.image && (
                           <div className="w-full">
                             <img
                               src={parsed.image}
-                              alt={`Diary entry for ${formatDate(entry.date)}`}
+                              alt={`Diary entry for ${formatTimestamp(entry.unixTimestamp)}`}
                               className="max-w-full max-h-96 rounded-lg object-contain mx-auto"
                             />
                           </div>
