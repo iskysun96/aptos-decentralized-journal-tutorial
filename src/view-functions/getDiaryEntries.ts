@@ -241,7 +241,7 @@ export const getDiaryEntries = async (userAddress: string): Promise<DiaryEntry[]
       return [];
     }
     console.error("Error fetching diary entries:", error);
-    return [];
+    throw error;
   }
 };
 
