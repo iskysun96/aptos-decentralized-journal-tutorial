@@ -1,10 +1,18 @@
 import { GraphQLClient } from "graphql-request";
 import { GRAPHQL_ENDPOINT, GRAPHQL_API_KEY } from "@/constants";
 
+// Validate required environment variables
+if (!GRAPHQL_ENDPOINT) {
+  throw new Error("GRAPHQL_ENDPOINT environment variable is required but not set.");
+}
+if (!GRAPHQL_API_KEY) {
+  throw new Error("GRAPHQL_API_KEY environment variable is required but not set.");
+}
+
 // Create GraphQL client with authentication
-export const graphqlClient = new GraphQLClient(GRAPHQL_ENDPOINT || "", {
+export const graphqlClient = new GraphQLClient(GRAPHQL_ENDPOINT, {
   headers: {
-    Authorization: `Bearer ${GRAPHQL_API_KEY || ""}`,
+    Authorization: `Bearer ${GRAPHQL_API_KEY}`,
     "Content-Type": "application/json",
   },
 });
