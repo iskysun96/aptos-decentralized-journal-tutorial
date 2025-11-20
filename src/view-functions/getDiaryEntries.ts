@@ -178,7 +178,7 @@ export const getDiaryEntries = async (userAddress: string): Promise<DiaryEntry[]
     
     // Fallback to blockchain view function if GraphQL didn't return an address
     // Only fallback if GraphQL returned not_found (not if it had an error, as that might be transient)
-    if (addressResult.address === null && addressResult.source === 'not_found') {
+    if (addressResult.address === null && addressResult.source === 'not_found' && !addressResult.error) {
       addressResult = await getDiaryObjectAddress(userAddress);
       console.log("Diary object address from blockchain:", addressResult);
     }
