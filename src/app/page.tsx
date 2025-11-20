@@ -81,9 +81,9 @@ export default function DiaryPage() {
           <CardHeader>
             <div className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-2xl">Permanent Diary</CardTitle>
+                <CardTitle className="text-2xl">Lasting Words</CardTitle>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Record your daily thoughts. Each entry is permanently stored on the Aptos blockchain and can be updated throughout the day.
+                  Write your daily thoughts. Your words are securely stored and always yours to control.                
                 </p>
               </div>
               {connected && (
