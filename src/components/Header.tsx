@@ -7,11 +7,11 @@ import { WalletSelector } from "./WalletSelector";
 export function Header() {
   const pathname = usePathname();
   const isWritePage = pathname === "/";
-  const isDiaryPage = pathname === "/view";
+  const isJournalPage = pathname === "/view";
 
   return (
     <div className="w-full border-b border-border">
-      <div className="flex items-center justify-between px-6 py-5 w-full relative">
+      <div className="flex items-center justify-between px-6 py-3 w-full relative">
         <Link href="/" className="hover:opacity-70 transition-opacity flex items-center">
           <h1 className="text-lg font-light">Lasting Words</h1>
         </Link>
@@ -29,12 +29,12 @@ export function Header() {
           <Link
             href="/view"
             className={`text-sm transition-colors pb-2 border-b-2 flex items-center ${
-              isDiaryPage
+              isJournalPage
                 ? "text-foreground font-medium border-foreground"
                 : "text-muted-foreground hover:text-foreground border-transparent"
             }`}
           >
-            My Diary
+            My Journal
           </Link>
         </nav>
         <WalletSelector />

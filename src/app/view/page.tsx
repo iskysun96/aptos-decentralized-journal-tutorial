@@ -57,7 +57,7 @@ const parseContent = (content: string): { image?: string; message: string } => {
   }
 };
 
-export default function ViewDiaryPage() {
+export default function ViewJournalPage() {
   const { account, connected, signAndSubmitTransaction } = useWallet();
   const [deletingTimestamps, setDeletingTimestamps] = useState<Set<number>>(new Set());
   const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
@@ -136,7 +136,7 @@ export default function ViewDiaryPage() {
 
       await refetch();
     } catch (error: any) {
-      console.error("Error deleting diary entry:", error);
+      console.error("Error deleting journal entry:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -157,7 +157,17 @@ export default function ViewDiaryPage() {
         <Header />
         <div className="flex-1 flex items-center justify-center px-4">
           <div className="text-center space-y-6">
-            <p className="text-2xl font-light text-foreground">Login to view your diary</p>
+            <div className="space-y-4">
+              <p className="text-2xl font-light text-foreground">Login to view your journal</p>
+              <div className="space-y-2 max-w-md mx-auto">
+                <p className="text-lg text-foreground/80 leading-relaxed font-light italic">
+                  Leave your mark on the world. Your words will outlive you, preserved forever.
+                </p>
+                <p className="text-xs text-muted-foreground/70 leading-relaxed">
+                  Your notes belong to you. Only you can delete them. A small fee applies when saving.
+                </p>
+              </div>
+            </div>
             <Dialog open={isWalletDialogOpen} onOpenChange={setIsWalletDialogOpen}>
               <DialogTrigger asChild>
                 <Button>Login or Sign Up</Button>

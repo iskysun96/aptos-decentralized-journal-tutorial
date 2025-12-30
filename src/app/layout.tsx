@@ -16,9 +16,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  applicationName: "Diary",
-  title: "Diary",
-  description: "A simple diary app",
+  applicationName: "Lasting Words",
+  title: "Lasting Words",
+  description: "Own your notes - permanent, decentralized journaling",
   manifest: "/manifest.json",
 };
 
