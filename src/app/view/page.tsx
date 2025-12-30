@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
 import { aptosClient } from "@/utils/aptosClient";
@@ -12,6 +12,8 @@ import { toast } from "@/components/ui/use-toast";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { ConnectWalletDialog } from "@/components/WalletSelector";
 import Link from "next/link";
+
+const ENTRIES_PER_PAGE = 5;
 
 const formatDate = (unixTimestamp: number): string => {
   const date = new Date(unixTimestamp * 1000);
@@ -59,6 +61,7 @@ export default function ViewDiaryPage() {
   const { account, connected, signAndSubmitTransaction } = useWallet();
   const [deletingTimestamps, setDeletingTimestamps] = useState<Set<number>>(new Set());
   const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { data: entries, isLoading, refetch } = useQuery({
     queryKey: ["diary-entries", account?.address?.toString()],
@@ -68,6 +71,40 @@ export default function ViewDiaryPage() {
     },
     enabled: !!account && connected,
   });
+
+  // Calculate pagination
+  const pagination = useMemo(() => {
+    if (!entries || entries.length === 0) {
+      return {
+        totalPages: 0,
+        currentPageEntries: [],
+        startIndex: 0,
+        endIndex: 0,
+      };
+    }
+
+    const totalPages = Math.ceil(entries.length / ENTRIES_PER_PAGE);
+    const startIndex = (currentPage - 1) * ENTRIES_PER_PAGE;
+    const endIndex = startIndex + ENTRIES_PER_PAGE;
+    const currentPageEntries = entries.slice(startIndex, endIndex);
+
+    return {
+      totalPages,
+      currentPageEntries,
+      startIndex,
+      endIndex,
+    };
+  }, [entries, currentPage]);
+
+  // Reset to page 1 when entries change and current page is out of bounds
+  useEffect(() => {
+    if (entries && entries.length > 0) {
+      const totalPages = Math.ceil(entries.length / ENTRIES_PER_PAGE);
+      if (currentPage > totalPages) {
+        setCurrentPage(1);
+      }
+    }
+  }, [entries]);
 
   const handleDelete = async (unixTimestamp: number) => {
     if (!account) {
@@ -155,10 +192,15 @@ export default function ViewDiaryPage() {
               <div className="space-y-1 mb-4 pb-4 border-b border-border">
                 <p className="text-sm text-muted-foreground">
                   {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
+                  {pagination.totalPages > 1 && (
+                    <span className="ml-2">
+                      (Page {currentPage} of {pagination.totalPages})
+                    </span>
+                  )}
                 </p>
               </div>
               <div className="space-y-8">
-              {entries.map((entry, index) => {
+              {pagination.currentPageEntries.map((entry, index) => {
                 const parsed = parseContent(entry.content);
                 const isDeleting = deletingTimestamps.has(entry.unixTimestamp);
                 return (
@@ -194,13 +236,70 @@ export default function ViewDiaryPage() {
                       </div>
                     )}
                     
-                    {index < entries.length - 1 && (
+                    {index < pagination.currentPageEntries.length - 1 && (
                       <div className="border-t border-border pt-8 mt-8" />
                     )}
                   </div>
                 );
               })}
               </div>
+              
+              {/* Pagination Controls */}
+              {pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  
+                  <div className="flex items-center gap-2">
+                    {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => {
+                      // Show first page, last page, current page, and pages around current
+                      const showPage = 
+                        pageNum === 1 ||
+                        pageNum === pagination.totalPages ||
+                        (pageNum >= currentPage - 1 && pageNum <= currentPage + 1);
+                      
+                      if (!showPage) {
+                        // Show ellipsis
+                        if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                          return (
+                            <span key={pageNum} className="text-muted-foreground px-2">
+                              ...
+                            </span>
+                          );
+                        }
+                        return null;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={pageNum === currentPage ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className="min-w-[2.5rem]"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.min(pagination.totalPages, prev + 1))}
+                    disabled={currentPage === pagination.totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
             </>
           )}
         </div>
