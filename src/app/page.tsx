@@ -93,6 +93,7 @@ export default function DiaryPage() {
                   placeholder="Start writing..."
                   className="min-h-[450px] border shadow-md focus-visible:ring-1 focus-visible:ring-ring text-base resize-none bg-background p-6 pr-16 leading-relaxed"
                   disabled={isSubmitting}
+                  maxLength={10000}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                       handleSubmit();
