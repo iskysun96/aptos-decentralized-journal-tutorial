@@ -9,6 +9,8 @@ import { deleteDailyEntry } from "@/entry-functions/deleteDailyEntry";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import { ConnectWalletDialog } from "@/components/WalletSelector";
 import Link from "next/link";
 
 const formatDate = (unixTimestamp: number): string => {
@@ -56,6 +58,7 @@ const parseContent = (content: string): { image?: string; message: string } => {
 export default function ViewDiaryPage() {
   const { account, connected, signAndSubmitTransaction } = useWallet();
   const [deletingTimestamps, setDeletingTimestamps] = useState<Set<number>>(new Set());
+  const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
 
   const { data: entries, isLoading, refetch } = useQuery({
     queryKey: ["diary-entries", account?.address?.toString()],
@@ -113,107 +116,20 @@ export default function ViewDiaryPage() {
 
   if (!connected) {
     return (
-      <>
+      <div className="h-screen flex flex-col">
         <Header />
-        <div className="min-h-screen flex items-center justify-center px-4 py-12">
-          <div className="max-w-2xl w-full">
-            <div className="space-y-12 py-8">
-              <div className="space-y-6 text-center">
-                <h2 className="text-3xl font-light text-foreground">
-                  Your thoughts, permanently yours
-                </h2>
-                <p className="text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
-                  A simple diary that stores your words on the blockchain. 
-                  Write freely, knowing your entries are secure and truly yours.
-                </p>
-              </div>
-
-              <div className="grid gap-6 md:grid-cols-3 pt-8">
-                <div className="space-y-3">
-                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="text-foreground"
-                    >
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    </svg>
-                  </div>
-                  <h3 className="font-medium text-center">Secure</h3>
-                  <p className="text-sm text-muted-foreground text-center">
-                    Your entries are stored on the blockchain, protected by cryptography
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="text-foreground"
-                    >
-                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                      <line x1="12" y1="22.08" x2="12" y2="12" />
-                    </svg>
-                  </div>
-                  <h3 className="font-medium text-center">Permanent</h3>
-                  <p className="text-sm text-muted-foreground text-center">
-                    Your words are stored permanently. Only you can read or delete them
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="text-foreground"
-                    >
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <line x1="16" y1="13" x2="8" y2="13" />
-                      <line x1="16" y1="17" x2="8" y2="17" />
-                      <polyline points="10 9 9 9 8 9" />
-                    </svg>
-                  </div>
-                  <h3 className="font-medium text-center">Simple</h3>
-                  <p className="text-sm text-muted-foreground text-center">
-                    Clean, minimal interface focused on your writing experience
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-8 text-center space-y-4">
-                <p className="text-muted-foreground">
-                  Connect your wallet to view your entries
-                </p>
-              </div>
-            </div>
+        <div className="flex-1 flex items-center justify-center px-4">
+          <div className="text-center space-y-6">
+            <p className="text-2xl font-light text-foreground">Login to view your diary</p>
+            <Dialog open={isWalletDialogOpen} onOpenChange={setIsWalletDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>Login or Sign Up</Button>
+              </DialogTrigger>
+              <ConnectWalletDialog close={() => setIsWalletDialogOpen(false)} />
+            </Dialog>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
