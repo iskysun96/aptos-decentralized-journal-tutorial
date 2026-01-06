@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = []
 
 [addresses]
-permanent_diary_addr = "_"
+decentralized_journal_addr = "_"
 
 [dependencies]
 AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", rev = "mainnet", subdir = "aptos-framework" }

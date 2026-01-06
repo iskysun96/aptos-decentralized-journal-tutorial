@@ -7,38 +7,6 @@ export type DiaryEntry = {
   content: string;
 };
 
-// Get diary object address for a user (blockchain fallback)
-const getDiaryObjectAddress = async (userAddress: string): Promise<DiaryObjectAddressResult> => {
-  try {
-    const result = await aptosClient().view<[string | null]>({
-      payload: {
-        function: `${MODULE_ADDRESS}::permanent_diary::get_diary_object_address`,
-        functionArguments: [userAddress],
-      },
-    });
-    const address = result[0];
-    if (address) {
-      return {
-        address,
-        source: 'blockchain',
-      };
-    }
-    return {
-      address: null,
-      source: 'not_found',
-    };
-  } catch (error: any) {
-    const errorMessage = error?.message || String(error);
-    console.error("Error getting diary object address:", errorMessage);
-    return {
-      address: null,
-      source: 'not_found',
-      error: errorMessage,
-    };
-  }
-};
-
-
 // Helper function to extract message from DiaryEntry enum
 // DiaryEntry::MessageOnly { message: String }
 // Structure: { __variant__: "MessageOnly", message: "..." }
@@ -172,16 +140,9 @@ const parseBigOrderedMap = (mapData: any): Array<{ key: number; value: any }> =>
 export const getDiaryEntries = async (userAddress: string): Promise<DiaryEntry[]> => {
   try {
     // First, try to get the diary object address from GraphQL (fast, indexed)
-    // Fall back to blockchain view function if GraphQL fails
     let addressResult: DiaryObjectAddressResult = await getDiaryObjectAddressFromGraphQL(userAddress);
     console.log("Diary object address from GraphQL:", addressResult);
-    
-    // Fallback to blockchain view function if GraphQL didn't return an address
-    // Only fallback if GraphQL returned not_found (not if it had an error, as that might be transient)
-    if (addressResult.address === null && addressResult.source === 'not_found' && !addressResult.error) {
-      addressResult = await getDiaryObjectAddress(userAddress);
-      console.log("Diary object address from blockchain:", addressResult);
-    }
+
     
     if (!addressResult.address) {
       return [];
