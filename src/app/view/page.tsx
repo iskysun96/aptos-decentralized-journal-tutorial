@@ -145,7 +145,7 @@ export default function ViewJournalPage() {
     }
   };
 
-  if (!connected) {
+  if (true) { // TODO: replace with !connected when wallet adapter is implemented
     return (
       <div className="h-screen flex flex-col">
         <Header />
