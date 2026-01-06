@@ -1,9 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import { aptosClient } from "@/utils/aptosClient";
-import { addDailyEntry } from "@/entry-functions/addDailyEntry";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
@@ -12,7 +9,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { ConnectWalletDialog } from "@/components/WalletSelector";
 
 export default function JournalPage() {
-  const { account, signAndSubmitTransaction, connected } = useWallet();
+  // TODO: setup wallet adapter
   
   const [diaryMessage, setDiaryMessage] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,27 +30,24 @@ export default function JournalPage() {
       return;
     }
 
+    // TODO: Implement transaction submission
+    // 1. Import addDailyEntry function from @/entry-functions/addDailyEntry
+    // 2. Import aptosClient from @/utils/aptosClient
+    // 3. Build transaction using addDailyEntry({ content: diaryMessage.trim() })
+    // 4. Sign and submit transaction using signAndSubmitTransaction
+    // 5. Wait for transaction confirmation using aptosClient().waitForTransaction
+    // 6. Show success message and clear the form
+    
     setIsSubmitting(true);
 
     try {
-      const content = diaryMessage.trim();
-
-      const committedTransaction = await signAndSubmitTransaction(
-        addDailyEntry({
-          content,
-        })
-      );
-
-      await aptosClient().waitForTransaction({
-        transactionHash: committedTransaction.hash,
-      });
-
       toast({
-        title: "Saved",
-        description: "Your entry has been saved",
+        title: "TODO",
+        description: "Implement transaction submission",
       });
 
-      setDiaryMessage("");
+      // TODO: Uncomment after implementing transaction
+      // setDiaryMessage("");
     } catch (error: any) {
       console.error("Error submitting journal entry:", error);
       toast({
