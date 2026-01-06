@@ -1,5 +1,5 @@
-
 import { InputTransactionData } from "@aptos-labs/wallet-adapter-react";
+// TODO: import module address
 
 export type AddDailyEntryArguments = {
   content: string;

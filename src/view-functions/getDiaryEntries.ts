@@ -1,3 +1,5 @@
+// TODO: import necessary imports
+
 export type DiaryEntry = {
   unixTimestamp: number; // Unix timestamp in seconds
   content: string;
