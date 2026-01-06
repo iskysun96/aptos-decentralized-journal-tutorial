@@ -5,63 +5,47 @@ import { executeQuery } from "@/utils/graphqlClient";
  */
 export type DiaryObjectAddressResult = {
   address: string | null;
-  source: 'graphql' | 'blockchain' | 'not_found';
-  error?: string;
+  source: 'graphql' | 'not_found';
 };
 
 /**
- * Get diary object address for a user from GraphQL database
- * This queries the indexed events/data to quickly get the diary object address
- * without needing to call the slow blockchain view function
+ * Helper function to extract address string from GraphQL response
+ * 
+ * GraphQL may return the address in different formats:
+ * - Direct string: "0x123..."
+ * - Wrapped in vec: { vec: ["0x123..."] }
  */
-// Helper function to safely extract address string from any format
-// maxDepth prevents stack overflow from deeply nested or malicious data structures
-const extractAddressString = (value: any, currentDepth: number = 0, maxDepth: number = 20): string | null => {
-  // Prevent stack overflow from excessive recursion
-  if (currentDepth > maxDepth) {
-    return null;
-  }
-  
+const extractAddressString = (value: any): string | null => {
+  // If it's already a string, return it
   if (typeof value === 'string') {
     return value;
   }
   
-  if (typeof value === 'object' && value !== null) {
-    // Check for vec property
-    if ('vec' in value) {
-      const vecValue = value.vec;
-      if (Array.isArray(vecValue) && vecValue.length > 0) {
-        const first = vecValue[0];
-        return typeof first === 'string' ? first : String(first);
-      }
-      if (typeof vecValue === 'string') {
-        return vecValue;
-      }
-      if (typeof vecValue === 'object' && vecValue !== null) {
-        // Recursively search for string
-        return extractAddressString(vecValue, currentDepth + 1, maxDepth);
-      }
-    }
-    
-    // Search for any string property that looks like an address
-    for (const key in value) {
-      if (typeof value[key] === 'string' && value[key].startsWith('0x')) {
-        return value[key];
-      }
-      if (typeof value[key] === 'object') {
-        const nested = extractAddressString(value[key], currentDepth + 1, maxDepth);
-        if (nested) return nested;
-      }
-    }
+  // If it's wrapped in a vec array, get the first element
+  if (value?.vec && Array.isArray(value.vec) && value.vec.length > 0) {
+    return String(value.vec[0]);
   }
   
   return null;
 };
 
+/**
+ * Get diary object address for a user from GraphQL database
+ * 
+ * Aptos Indexer provides a GraphQL API that indexes blockchain data.
+ * This is much faster than querying the blockchain directly because:
+ * - It's indexed (fast lookups)
+ * - It's optimized for queries
+ * - It doesn't require blockchain RPC calls
+ * 
+ * The GraphQL schema includes a `user_to_diary_object` table that maps
+ * user addresses to their diary object addresses.
+ */
 export const getDiaryObjectAddressFromGraphQL = async (
   userAddress: string
 ): Promise<DiaryObjectAddressResult> => {
   try {
+    // GraphQL query to find the diary object address for this user
     const query = `
       query GetDiaryObjectAddress($userAddress: String!) {
         user_to_diary_object(
@@ -73,42 +57,38 @@ export const getDiaryObjectAddressFromGraphQL = async (
       }
     `;
 
+    // Execute the query
     const data = await executeQuery<{
       user_to_diary_object?: Array<{
-        user_diary_object_address: string | { vec?: string[] } | any;
+        user_diary_object_address: string | { vec?: string[] };
       }>;
     }>(query, {
       userAddress: userAddress.toLowerCase(),
     });
 
-    if (
-      data?.user_to_diary_object &&
-      data.user_to_diary_object.length > 0 &&
-      data.user_to_diary_object[0].user_diary_object_address
-    ) {
-      const addressValue = data.user_to_diary_object[0].user_diary_object_address;
-      const extractedAddress = extractAddressString(addressValue);
-      if (extractedAddress) {
+    // Check if we found a result
+    const result = data?.user_to_diary_object?.[0];
+    if (result?.user_diary_object_address) {
+      const address = extractAddressString(result.user_diary_object_address);
+      if (address) {
         return {
-          address: extractedAddress,
+          address,
           source: 'graphql',
         };
       }
     }
 
-    // GraphQL query succeeded but no diary found
+    // No diary found for this user
     return {
       address: null,
       source: 'not_found',
     };
   } catch (error: any) {
-    // GraphQL query failed due to error (network, auth, etc.)
-    const errorMessage = error?.message || String(error);
-    console.error("Error fetching diary object address from GraphQL:", errorMessage);
+    // If GraphQL fails, return not_found (caller can handle fallback)
+    console.error("Error fetching diary object address from GraphQL:", error);
     return {
       address: null,
-      source: 'not_found', // Will trigger blockchain fallback
-      error: errorMessage,
+      source: 'not_found',
     };
   }
 };
