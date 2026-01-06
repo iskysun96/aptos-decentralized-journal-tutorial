@@ -9,26 +9,9 @@ if (!GRAPHQL_API_KEY) {
   throw new Error("GRAPHQL_API_KEY environment variable is required but not set.");
 }
 
-// Create GraphQL client with authentication
-export const graphqlClient = new GraphQLClient(GRAPHQL_ENDPOINT, {
-  headers: {
-    Authorization: `Bearer ${GRAPHQL_API_KEY}`,
-    "Content-Type": "application/json",
-  },
-});
+// TODO: Create GraphQL client with authentication
 
-// Execute a GraphQL query
-export async function executeQuery<T = any>(
-  query: string,
-  variables?: Record<string, any>
-): Promise<T> {
-  try {
-    const data = await graphqlClient.request<T>(query, variables);
-    return data;
-  } catch (error: any) {
-    console.error("GraphQL query error:", error);
-    // Re-throw to allow caller to handle
-    throw error;
-  }
-}
+
+// TODO: Execute a GraphQL query
+
 
