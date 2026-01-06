@@ -1,11 +1,9 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
-import { aptosClient } from "@/utils/aptosClient";
-import { getDiaryEntries } from "@/view-functions/getDiaryEntries";
-import { deleteDailyEntry } from "@/entry-functions/deleteDailyEntry";
+// TODO: import Aptos related imports
+
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
@@ -58,20 +56,15 @@ const parseContent = (content: string): { image?: string; message: string } => {
 };
 
 export default function ViewJournalPage() {
-  const { account, connected, signAndSubmitTransaction } = useWallet();
+  // TODO: setup wallet adapter
+  
   const [deletingTimestamps, setDeletingTimestamps] = useState<Set<number>>(new Set());
   const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { data: entries, isLoading, refetch } = useQuery({
-    queryKey: ["diary-entries", account?.address?.toString()],
-    queryFn: async () => {
-      if (!account) return [];
-      return await getDiaryEntries(account.address.toString());
-    },
-    enabled: !!account && connected,
-  });
-
+  // TODO: Implement query to get entries
+  const entries = [];
+  
   // Calculate pagination
   const pagination = useMemo(() => {
     if (!entries || entries.length === 0) {
@@ -116,25 +109,26 @@ export default function ViewJournalPage() {
       return;
     }
 
+    // TODO: Implement deletion
+    // 1. Import deleteDailyEntry from @/entry-functions/deleteDailyEntry
+    // 2. Import aptosClient from @/utils/aptosClient
+    // 3. Build transaction using deleteDailyEntry({ unixTimestamp })
+    // 4. Sign and submit transaction using signAndSubmitTransaction
+    // 5. Wait for transaction confirmation using aptosClient().waitForTransaction
+    // 6. Show success message and refetch entries
+
     setDeletingTimestamps((prev) => new Set(prev).add(unixTimestamp));
 
     try {
-      const committedTransaction = await signAndSubmitTransaction(
-        deleteDailyEntry({
-          unixTimestamp,
-        })
-      );
-
-      await aptosClient().waitForTransaction({
-        transactionHash: committedTransaction.hash,
-      });
+      // TODO: Implement deletion here
 
       toast({
-        title: "Deleted",
-        description: "Entry has been deleted",
+        title: "TODO",
+        description: "Implement deletion",
       });
 
-      await refetch();
+      // TODO: Uncomment after implementing deletion
+      // await refetch();
     } catch (error: any) {
       console.error("Error deleting journal entry:", error);
       toast({

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+// TODO: import Aptos related imports
+
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
@@ -16,6 +18,8 @@ export default function JournalPage() {
   const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
 
   const handleSubmit = async () => {
+    // TODO: Implement wallet adapter setup here
+    
     if (!account || !connected) {
       setIsWalletDialogOpen(true);
       return;
@@ -41,6 +45,8 @@ export default function JournalPage() {
     setIsSubmitting(true);
 
     try {
+      // TODO: Implement transaction submission here
+
       toast({
         title: "TODO",
         description: "Implement transaction submission",
