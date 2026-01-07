@@ -30,7 +30,7 @@ module decentralized_journal_addr::test_end_to_end {
         assert!(retrieved_content2 == string::utf8(b"Another wonderful day"), 4);
     }
 
-    // Test multiple users with separate diaries
+    // Test multiple users with separate journals
     #[test(publisher = @decentralized_journal_addr, user1 = @0x567)]
     fun test_multiple_users_user1(publisher: &signer, user1: &signer) {
         decentralized_journal::init_module_for_test(publisher);

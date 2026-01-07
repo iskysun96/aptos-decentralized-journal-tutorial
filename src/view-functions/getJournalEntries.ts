@@ -1,223 +1,111 @@
 import { MODULE_ADDRESS } from "@/constants";
 import { aptosClient } from "@/utils/aptosClient";
-import { getJournalObjectAddressFromGraphQL, type JournalObjectAddressResult } from "./getJournalObjectAddressFromGraphQL";
+import { getJournalObjectAddressFromGraphQL } from "./getJournalObjectAddressFromGraphQL";
 
+/**
+ * Journal entry type matching the Move contract structure
+ */
 export type JournalEntry = {
   unixTimestamp: number; // Unix timestamp in seconds
   content: string;
 };
 
-// Get journal object address for a user (blockchain fallback)
-const getJournalObjectAddress = async (userAddress: string): Promise<JournalObjectAddressResult> => {
-  try {
-    const result = await aptosClient().view<[string | null]>({
-      payload: {
-        function: `${MODULE_ADDRESS}::decentralized_journal::get_journal_object_address`,
-        functionArguments: [userAddress],
-      },
-    });
-    const address = result[0];
-    if (address) {
-      return {
-        address,
-        source: 'blockchain',
-      };
-    }
-    return {
-      address: null,
-      source: 'not_found',
-    };
-  } catch (error: any) {
-    const errorMessage = error?.message || String(error);
-    console.error("Error getting journal object address:", errorMessage);
-    return {
-      address: null,
-      source: 'not_found',
-      error: errorMessage,
-    };
-  }
-};
-
-
-// Helper function to extract message from JournalEntry enum
-// JournalEntry::MessageOnly { message: String }
-// Structure: { __variant__: "MessageOnly", message: "..." }
+// Extract the message content from a JournalEntry enum
 const extractMessageFromEntry = (entry: any): string | null => {
-  if (typeof entry === "string") {
-    return entry;
+  if (entry?.__variant__ === "Leaf" && entry?.value?.message) {
+    return entry.value.message;
   }
-  
-  if (typeof entry === "object" && entry !== null) {
-    // Check for MessageOnly variant with __variant__ field
-    if (entry.__variant__ === "MessageOnly" && "message" in entry) {
-      return entry.message;
-    }
-    
-    // Check for MessageOnly variant (nested structure)
-    if ("MessageOnly" in entry) {
-      const messageOnly = entry.MessageOnly;
-      if (typeof messageOnly === "object" && messageOnly !== null && "message" in messageOnly) {
-        return messageOnly.message;
-      }
-    }
-    
-    // Check if message is directly in the object
-    if ("message" in entry) {
-      return entry.message;
-    }
-  }
-  
   return null;
 };
 
-// Helper function to recursively extract entries from BPlusTreeMap nodes
-// Handles both leaf nodes and internal nodes
-// maxDepth prevents stack overflow from deeply nested or malicious tree structures
-const extractEntriesFromNode = (node: any, currentDepth: number = 0, maxDepth: number = 20): Array<{ key: number; value: any }> => {
+/**
+ * Extract entries from a BPlusTreeMap node
+ * 
+ * BigOrderedMap uses a B+ tree structure internally. Each node can be:
+ * - A leaf node: contains actual key-value pairs (is_leaf: true)
+ * - An internal node: contains pointers to child nodes (is_leaf: false)
+ * 
+ * For small maps (< 40 entries), the root is also a leaf node.
+ * For larger maps, we need to recursively traverse internal nodes.
+ */
+const extractEntriesFromNode = (
+  node: any,
+  depth: number = 0,
+  maxDepth: number = 20
+): Array<{ key: number; value: any }> => {
   const entries: Array<{ key: number; value: any }> = [];
-  
-  // Prevent stack overflow from excessive recursion
-  if (currentDepth > maxDepth) {
+
+  // Safety check: prevent infinite recursion
+  if (depth > maxDepth || !node || typeof node !== "object") {
     return entries;
   }
-  
-  if (!node || typeof node !== "object") {
-    return entries;
-  }
-  
-  // If it's a leaf node, extract entries directly
-  if (node.is_leaf === true && node.children) {
-    const children = node.children;
-    
-    // Check if children has entries (SortedVectorMap structure)
-    if (children.entries && Array.isArray(children.entries)) {
-      for (const entry of children.entries) {
-        if (entry && typeof entry === "object" && "key" in entry && "value" in entry) {
-          // Key is unix timestamp as string, convert to number
-          const key = typeof entry.key === "string" ? parseInt(entry.key, 10) : Number(entry.key);
-          
-          // Value structure: { __variant__: "Leaf", value: { __variant__: "MessageOnly", message: "..." } }
-          // Or: { __variant__: "MessageOnly", message: "..." }
-          // Extract the actual value (nested structure)
-          let actualValue = entry.value;
-          
-          // If value has a nested structure with Leaf variant, get the inner value
-          if (actualValue && typeof actualValue === "object" && actualValue.__variant__ === "Leaf" && actualValue.value) {
-            actualValue = actualValue.value;
-          }
-          
-          entries.push({ key, value: actualValue });
-        }
+
+  // Leaf node: extract entries directly
+  if (node.is_leaf === true && node.children?.entries) {
+    for (const entry of node.children.entries) {
+      if (entry?.key !== undefined && entry?.value !== undefined) {
+        const key = typeof entry.key === "string" 
+          ? parseInt(entry.key, 10) 
+          : Number(entry.key);
+        entries.push({ key, value: entry.value });
       }
     }
-  } else if (node.children && node.children.entries) {
-    // Internal node - recursively extract from children
-    // For internal nodes, we might need to traverse further, but for now
-    // if there are entries, process them
-    if (Array.isArray(node.children.entries)) {
-      for (const entry of node.children.entries) {
-        if (entry && typeof entry === "object" && "value" in entry) {
-          // Recursively extract from child nodes
-          const childEntries = extractEntriesFromNode(entry.value, currentDepth + 1, maxDepth);
-          entries.push(...childEntries);
-        }
+  } 
+  // Internal node: recursively extract from child nodes
+  else if (node.children?.entries) {
+    for (const childEntry of node.children.entries) {
+      if (childEntry?.value) {
+        const childEntries = extractEntriesFromNode(
+          childEntry.value,
+          depth + 1,
+          maxDepth
+        );
+        entries.push(...childEntries);
       }
     }
   }
-  
+
   return entries;
 };
 
-// Helper function to parse BPlusTreeMap structure from Aptos resource
-// BPlusTreeMap is the underlying structure for BigOrderedMap
-const parseBigOrderedMap = (mapData: any): Array<{ key: number; value: any }> => {
-  const entries: Array<{ key: number; value: any }> = [];
-  
-  if (!mapData || typeof mapData !== "object") {
-    console.log("Map data is not an object");
-    return entries;
-  }
-  
-  // Check if it's a BPlusTreeMap structure
-  if (mapData.__variant__ === "BPlusTreeMap" && mapData.root) {
-    // Extract entries from the root node (recursively handles leaf and internal nodes)
-    const rootEntries = extractEntriesFromNode(mapData.root, 0, 20);
-    entries.push(...rootEntries);
-  } else if (mapData.root) {
-    // Try to extract even if __variant__ is not set
-    const rootEntries = extractEntriesFromNode(mapData.root, 0, 20);
-    entries.push(...rootEntries);
-  } else {
-    // Fallback: try other structures
-    if (Array.isArray(mapData)) {
-      // Direct array
-      for (const item of mapData) {
-        if (Array.isArray(item) && item.length >= 2) {
-          const key = typeof item[0] === "string" ? parseInt(item[0], 10) : Number(item[0]);
-          entries.push({ key, value: item[1] });
-        } else if (typeof item === "object" && item !== null && "key" in item && "value" in item) {
-          const key = typeof item.key === "string" ? parseInt(item.key, 10) : Number(item.key);
-          entries.push({ key, value: item.value });
-        }
-      }
-    } else if (mapData.handle) {
-      console.warn("BigOrderedMap is a table handle - cannot directly access all entries");
-      return entries;
-    }
-  }
-  
-  return entries;
-};
-
+/**
+ * Main function: Fetch all journal entries for a user
+ * 
+ * This function:
+ * 1. Gets the journal object address (from GraphQL)
+ * 2. Queries the Journal resource from that object address
+ * 3. Extracts entries from the BigOrderedMap (B+ tree structure)
+ * 4. Converts entries to JournalEntry format
+ * 5. Sorts by timestamp (newest first)
+ */
 export const getJournalEntries = async (userAddress: string): Promise<JournalEntry[]> => {
   try {
-    // First, try to get the journal object address from GraphQL (fast, indexed)
-    // Fall back to blockchain view function if GraphQL fails
-    let addressResult: JournalObjectAddressResult = await getJournalObjectAddressFromGraphQL(userAddress);
-    console.log("Journal object address from GraphQL:", addressResult);
-    
-    // Fallback to blockchain view function if GraphQL didn't return an address
-    // Only fallback if GraphQL returned not_found (not if it had an error, as that might be transient)
-    if (addressResult.address === null && addressResult.source === 'not_found' && !addressResult.error) {
-      addressResult = await getJournalObjectAddress(userAddress);
-      console.log("Journal object address from blockchain:", addressResult);
-    }
+    // Get the journal object address
+    const addressResult = await getJournalObjectAddressFromGraphQL(userAddress);
     
     if (!addressResult.address) {
-      return [];
+      return []; // No journal exists for this user
     }
-    
-    const journalObjectAddress = addressResult.address;
 
     // Query the Journal resource from the object address
     if (!MODULE_ADDRESS) {
       throw new Error("MODULE_ADDRESS is not defined");
     }
-    const resourceType = `${MODULE_ADDRESS}::decentralized_journal::Journal` as `${string}::${string}::${string}`;
+
+    const resourceType = `${MODULE_ADDRESS}::decentralized_journal::Journal` as const;
     const resource = await aptosClient().getAccountResource({
-      accountAddress: journalObjectAddress,
+      accountAddress: addressResult.address,
       resourceType,
     });
 
-    console.log("Journal resource:", resource);
-
-    if (!resource) {
-      console.log("Journal resource not found or empty");
-      return [];
+    if (!resource?.daily_entries?.root) {
+      console.log("No daily entries found");
+      return []; // Journal exists but has no entries
     }
 
-    // Extract daily_entries BigOrderedMap from resource
-    // The structure is: resource.daily_entries (not resource.data.daily_entries)
-    const dailyEntries = resource.daily_entries;
-    if (!dailyEntries) {
-      console.log("No daily_entries found in Journal resource");
-      return [];
-    }
-
-    // Parse the BigOrderedMap structure
-    const parsedEntries = parseBigOrderedMap(dailyEntries);
-    console.log("Parsed entries:", parsedEntries);
-    
+    // Extract entries from the BigOrderedMap (B+ tree structure)
+    // The daily_entries is a BigOrderedMap, which uses a B+ tree internally
+    const parsedEntries = extractEntriesFromNode(resource.daily_entries.root);
     // Convert to JournalEntry format
     const journalEntries: JournalEntry[] = [];
     for (const { key, value } of parsedEntries) {
@@ -232,12 +120,12 @@ export const getJournalEntries = async (userAddress: string): Promise<JournalEnt
 
     // Sort by timestamp (newest first)
     journalEntries.sort((a, b) => b.unixTimestamp - a.unixTimestamp);
-    
+
+    console.log("Journal entries:", journalEntries);
     return journalEntries;
   } catch (error: any) {
-    // Handle case where resource doesn't exist (404)
-    if (error?.status === 404 || error?.message?.includes("404") || error?.message?.includes("not found")) {
-      console.log("Journal resource not found at object address");
+    // Handle case where resource doesn't exist
+    if (error?.status === 404 || error?.message?.includes("not found")) {
       return [];
     }
     console.error("Error fetching journal entries:", error);

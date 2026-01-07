@@ -1,3 +1,9 @@
+/*
+    Decentralized Journal Module
+    Allows users to create and maintain a decentralized journal with daily entries.
+    Each user has their own journal object, and entries are stored by date (in unix seconds format).
+*/
+
 module decentralized_journal_addr::decentralized_journal {
     use std::string::String;
     use aptos_framework::object::{Self, ExtendRef};
@@ -42,16 +48,16 @@ module decentralized_journal_addr::decentralized_journal {
         date_in_unix_seconds: u64,
     }
 
-    /// journal entry enum - can be extended with more data types in the future
+    /// Journal entry enum - can be extended with more data types in the future
     enum JournalEntry has store, drop, copy {
         MessageOnly {
             message: String
         }
     }
 
-    const JOURNALS_REGISTRY_OBJECT_SEED: vector<u8> = b"my_decentralized_journal_registry";
+    const JOURNAL_REGISTRY_OBJECT_SEED: vector<u8> = b"my_decentralized_journal_registry";
     
-    /// Error code: journal not found for the user
+    /// Error code: Journal not found for the user
     const E_JOURNAL_NOT_FOUND: u64 = 1;
     /// Error code: Entry not found for the given timestamp
     const E_ENTRY_NOT_FOUND: u64 = 2;
@@ -62,7 +68,7 @@ module decentralized_journal_addr::decentralized_journal {
     const MAX_CONTENT_LENGTH: u64 = 10000;
 
     fun init_module(sender: &signer) {
-        let journals_reg_constructor_ref = &object::create_named_object(sender, JOURNALS_REGISTRY_OBJECT_SEED);
+        let journals_reg_constructor_ref = &object::create_named_object(sender, JOURNAL_REGISTRY_OBJECT_SEED);
         let journals_reg_signer = object::generate_signer(journals_reg_constructor_ref);
 
         move_to(&journals_reg_signer, JournalsRegistry {
@@ -193,10 +199,10 @@ module decentralized_journal_addr::decentralized_journal {
 
     /// Returns the address of the journals registry object
     fun get_journals_reg_obj_address(): address {
-        object::create_object_address(&@decentralized_journal_addr, JOURNALS_REGISTRY_OBJECT_SEED)
+        object::create_object_address(&@decentralized_journal_addr, JOURNAL_REGISTRY_OBJECT_SEED)
     }
 
-    /// Helper function to extract message from journalEntry enum
+    /// Helper function to extract message from JournalEntry enum
     /// Uses pattern matching to extract the message from the enum variant
     fun extract_message_from_entry(entry: JournalEntry): String {
         let JournalEntry::MessageOnly { message } = entry;
@@ -205,20 +211,20 @@ module decentralized_journal_addr::decentralized_journal {
 
     // ======================== Helper functions ========================
 
-    /// Creates a new journal object for the sender and registers it in the global journals registry
-    /// Also creates the journalController for extending the journal object
+    /// Creates a new journal object for the sender and registers it in the global Journals registry
+    /// Also creates the JournalController for extending the journal object
     fun create_journal(sender: &signer) acquires JournalsRegistry {
         let journal_constructor_ref = &object::create_object(signer::address_of(sender));
 
         let journal_signer = object::generate_signer(journal_constructor_ref);
         let journal_addr = signer::address_of(&journal_signer);
         
-        // Create the journal resource
+        // Create the Journal resource
         move_to(&journal_signer, Journal {
             daily_entries: big_ordered_map::new_with_config(0, 0, false),
         });
 
-        // Create the journalController for extending the object
+        // Create the JournalController for extending the object
         move_to(&journal_signer, JournalController {
             extend_ref: object::generate_extend_ref(journal_constructor_ref),
         });
