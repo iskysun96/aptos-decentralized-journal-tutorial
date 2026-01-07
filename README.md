@@ -1,12 +1,12 @@
-# Decentralized Diary Tutorial Template
+# Decentralized Journal Tutorial Template
 
-A starter template for building a decentralized diary application on Aptos. This template includes all the UI components and styling, but the smart contract and blockchain integration logic are left for you to implement while following along with the tutorial video.
+A starter template for building a decentralized journal application on Aptos. This template includes all the UI components and styling, but the smart contract and blockchain integration logic are left for you to implement while following along with the tutorial video.
 
 ## 📺 Tutorial Video
 
 Follow along with the tutorial video to learn how to:
 - Build and publish a Move smart contract on Aptos
-- Implement entry functions for adding and deleting diary entries
+- Implement entry functions for adding and deleting journal entries
 - Create view functions to query blockchain data
 - Integrate wallet connection and transaction submission
 - Build a complete full-stack decentralized application
@@ -26,7 +26,7 @@ Follow along with the tutorial video to learn how to:
 
 ```bash
 git clone <repository-url>
-cd decentralized-diary-tutorial
+cd aptos-decentralized-journal-tutorial
 ```
 
 ### Install Dependencies
@@ -39,19 +39,32 @@ pnpm install
 
 ### Set Up Environment Variables
 
-1. Copy the example environment file:
+1. Initialize an Aptos account
+```bash
+aptos init
+```
+Choose `devnet` to begin with. This step will create a folder named `.aptos` which holds the initialized account info in the `config.yaml` file.
+
+2. Copy the example environment file:
 ```bash
 cp .env.example .env
 ```
 
-2. Open `.env` and configure the following variables:
+3. Open `.env` and configure the following variables:
 
 ```env
-# Network: "testnet" or "mainnet"
+# Network: "devnet", "testnet" or "mainnet"
 NEXT_PUBLIC_APP_NETWORK=testnet
 
 # Module Address: Set this after publishing your smart contract
 NEXT_PUBLIC_MODULE_ADDRESS=
+
+# Copy over the address from the `./aptos/config.yaml` file
+NEXT_MODULE_PUBLISHER_ACCOUNT_ADDRESS=
+
+# This is the module publisher account's private key. Be cautious about who you share it with, and ensure it is not exposed when deploying your dApp.
+# Copy over the address from the `./aptos/config.yaml` file
+NEXT_MODULE_PUBLISHER_ACCOUNT_PRIVATE_KEY=
 
 # Aptos API Key (Optional): Get from https://build.aptoslabs.com/
 NEXT_PUBLIC_APTOS_API_KEY=
@@ -80,29 +93,29 @@ Open [http://localhost:3000](http://localhost:3000) in your browser to see the a
 During the tutorial, you'll implement:
 
 ### Smart Contract (Move)
-- Struct definitions for diary entries
+- Struct definitions for journal entries
 - Entry functions: `add_daily_entry`, `delete_daily_entry_by_unixtimestamp`
-- View functions: `get_diary_object_address`, `get_diary_content_by_date`
+- View functions: `get_journal_object_address`, `get_journal_content_by_date`
 - Helper functions and error handling
 
 ### Frontend
 - Wallet connection integration
 - Transaction submission for adding entries
 - Transaction submission for deleting entries
-- Blockchain data queries to fetch diary entries
+- Blockchain data queries to fetch journal entries
 - GraphQL integration (optional, for performance)
 
 ## 🏗️ Project Structure
 
 ```
-decentralized-diary-tutorial/
+decentralized-journal-tutorial/
 ├── contract/                 # Move smart contract
 │   ├── sources/             # Contract source files
 │   └── tests/               # Contract tests
 ├── src/
 │   ├── app/                 # Next.js pages
-│   │   ├── page.tsx         # Write diary entry page
-│   │   └── view/            # View diary entries page
+│   │   ├── page.tsx         # Write journal entry page
+│   │   └── view/            # View journal entries page
 │   ├── components/          # React components
 │   ├── entry-functions/     # Transaction builders (TODO)
 │   ├── view-functions/       # Blockchain queries (TODO)
@@ -136,7 +149,7 @@ As you follow along with the tutorial video, you'll complete:
 - [ ] Set `NEXT_PUBLIC_MODULE_ADDRESS` in `.env`
 - [ ] Implement `addDailyEntry` transaction builder
 - [ ] Implement `deleteDailyEntry` transaction builder
-- [ ] Implement `getDiaryEntries` view function
+- [ ] Implement `getJournalEntries` view function
 - [ ] Connect wallet adapter in frontend
 - [ ] Integrate transaction submission
 - [ ] Test the complete application

@@ -1,17 +1,17 @@
 // TODO: import necessary imports
 
 /**
- * Result type for diary object address retrieval
+ * Result type for journal object address retrieval
  */
-export type DiaryObjectAddressResult = {
+export type JournalObjectAddressResult = {
   address: string | null;
   source: 'graphql' | 'not_found';
   error?: string;
 };
 
 /*
- * Get diary object address for a user from GraphQL database
- * This queries the indexed events/data to quickly get the diary object address
+ * Get journal object address for a user from GraphQL database
+ * This queries the indexed events/data to quickly get the journal object address
  * without needing to call the slow blockchain view function
  */
 // Helper function to safely extract address string from any format
@@ -22,10 +22,10 @@ const extractAddressString = (value: any, currentDepth: number = 0, maxDepth: nu
   return null;
 };
 
-export const getDiaryObjectAddressFromGraphQL = async (
+export const getJournalObjectAddressFromGraphQL = async (
   userAddress: string
-): Promise<DiaryObjectAddressResult> => {
+): Promise<JournalObjectAddressResult> => {
   // TODO: Implement this function
-  // Query the GraphQL database to get the diary object address for the user
+  // Query the GraphQL database to get the journal object address for the user
   throw new Error("Not implemented yet");
 };
