@@ -8,7 +8,7 @@ async function compile() {
     packageDirectoryPath: "contract",
     namedAddresses: {
       // Compile module with account address
-      permanent_diary_addr: process.env.NEXT_MODULE_PUBLISHER_ACCOUNT_ADDRESS,
+      decentralized_journal_addr: process.env.NEXT_MODULE_PUBLISHER_ACCOUNT_ADDRESS,
     },
   });
 }

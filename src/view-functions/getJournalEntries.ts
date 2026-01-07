@@ -1,18 +1,18 @@
 import { MODULE_ADDRESS } from "@/constants";
 import { aptosClient } from "@/utils/aptosClient";
-import { getDiaryObjectAddressFromGraphQL, type DiaryObjectAddressResult } from "./getDiaryObjectAddressFromGraphQL";
+import { getJournalObjectAddressFromGraphQL, type JournalObjectAddressResult } from "./getJournalObjectAddressFromGraphQL";
 
-export type DiaryEntry = {
+export type JournalEntry = {
   unixTimestamp: number; // Unix timestamp in seconds
   content: string;
 };
 
-// Get diary object address for a user (blockchain fallback)
-const getDiaryObjectAddress = async (userAddress: string): Promise<DiaryObjectAddressResult> => {
+// Get journal object address for a user (blockchain fallback)
+const getJournalObjectAddress = async (userAddress: string): Promise<JournalObjectAddressResult> => {
   try {
     const result = await aptosClient().view<[string | null]>({
       payload: {
-        function: `${MODULE_ADDRESS}::permanent_diary::get_diary_object_address`,
+        function: `${MODULE_ADDRESS}::decentralized_journal::get_journal_object_address`,
         functionArguments: [userAddress],
       },
     });
@@ -29,7 +29,7 @@ const getDiaryObjectAddress = async (userAddress: string): Promise<DiaryObjectAd
     };
   } catch (error: any) {
     const errorMessage = error?.message || String(error);
-    console.error("Error getting diary object address:", errorMessage);
+    console.error("Error getting journal object address:", errorMessage);
     return {
       address: null,
       source: 'not_found',
@@ -39,8 +39,8 @@ const getDiaryObjectAddress = async (userAddress: string): Promise<DiaryObjectAd
 };
 
 
-// Helper function to extract message from DiaryEntry enum
-// DiaryEntry::MessageOnly { message: String }
+// Helper function to extract message from JournalEntry enum
+// JournalEntry::MessageOnly { message: String }
 // Structure: { __variant__: "MessageOnly", message: "..." }
 const extractMessageFromEntry = (entry: any): string | null => {
   if (typeof entry === "string") {
@@ -169,40 +169,40 @@ const parseBigOrderedMap = (mapData: any): Array<{ key: number; value: any }> =>
   return entries;
 };
 
-export const getDiaryEntries = async (userAddress: string): Promise<DiaryEntry[]> => {
+export const getJournalEntries = async (userAddress: string): Promise<JournalEntry[]> => {
   try {
-    // First, try to get the diary object address from GraphQL (fast, indexed)
+    // First, try to get the journal object address from GraphQL (fast, indexed)
     // Fall back to blockchain view function if GraphQL fails
-    let addressResult: DiaryObjectAddressResult = await getDiaryObjectAddressFromGraphQL(userAddress);
-    console.log("Diary object address from GraphQL:", addressResult);
+    let addressResult: JournalObjectAddressResult = await getJournalObjectAddressFromGraphQL(userAddress);
+    console.log("Journal object address from GraphQL:", addressResult);
     
     // Fallback to blockchain view function if GraphQL didn't return an address
     // Only fallback if GraphQL returned not_found (not if it had an error, as that might be transient)
     if (addressResult.address === null && addressResult.source === 'not_found' && !addressResult.error) {
-      addressResult = await getDiaryObjectAddress(userAddress);
-      console.log("Diary object address from blockchain:", addressResult);
+      addressResult = await getJournalObjectAddress(userAddress);
+      console.log("Journal object address from blockchain:", addressResult);
     }
     
     if (!addressResult.address) {
       return [];
     }
     
-    const diaryObjectAddress = addressResult.address;
+    const journalObjectAddress = addressResult.address;
 
-    // Query the Diary resource from the object address
+    // Query the Journal resource from the object address
     if (!MODULE_ADDRESS) {
       throw new Error("MODULE_ADDRESS is not defined");
     }
-    const resourceType = `${MODULE_ADDRESS}::permanent_diary::Diary` as `${string}::${string}::${string}`;
+    const resourceType = `${MODULE_ADDRESS}::decentralized_journal::Journal` as `${string}::${string}::${string}`;
     const resource = await aptosClient().getAccountResource({
-      accountAddress: diaryObjectAddress,
+      accountAddress: journalObjectAddress,
       resourceType,
     });
 
-    console.log("Diary resource:", resource);
+    console.log("Journal resource:", resource);
 
     if (!resource) {
-      console.log("Diary resource not found or empty");
+      console.log("Journal resource not found or empty");
       return [];
     }
 
@@ -210,7 +210,7 @@ export const getDiaryEntries = async (userAddress: string): Promise<DiaryEntry[]
     // The structure is: resource.daily_entries (not resource.data.daily_entries)
     const dailyEntries = resource.daily_entries;
     if (!dailyEntries) {
-      console.log("No daily_entries found in Diary resource");
+      console.log("No daily_entries found in Journal resource");
       return [];
     }
 
@@ -218,12 +218,12 @@ export const getDiaryEntries = async (userAddress: string): Promise<DiaryEntry[]
     const parsedEntries = parseBigOrderedMap(dailyEntries);
     console.log("Parsed entries:", parsedEntries);
     
-    // Convert to DiaryEntry format
-    const diaryEntries: DiaryEntry[] = [];
+    // Convert to JournalEntry format
+    const journalEntries: JournalEntry[] = [];
     for (const { key, value } of parsedEntries) {
       const message = extractMessageFromEntry(value);
       if (message !== null) {
-        diaryEntries.push({
+        journalEntries.push({
           unixTimestamp: key,
           content: message,
         });
@@ -231,16 +231,16 @@ export const getDiaryEntries = async (userAddress: string): Promise<DiaryEntry[]
     }
 
     // Sort by timestamp (newest first)
-    diaryEntries.sort((a, b) => b.unixTimestamp - a.unixTimestamp);
+    journalEntries.sort((a, b) => b.unixTimestamp - a.unixTimestamp);
     
-    return diaryEntries;
+    return journalEntries;
   } catch (error: any) {
     // Handle case where resource doesn't exist (404)
     if (error?.status === 404 || error?.message?.includes("404") || error?.message?.includes("not found")) {
-      console.log("Diary resource not found at object address");
+      console.log("Journal resource not found at object address");
       return [];
     }
-    console.error("Error fetching diary entries:", error);
+    console.error("Error fetching journal entries:", error);
     throw error;
   }
 };

@@ -1,17 +1,17 @@
 import { executeQuery } from "@/utils/graphqlClient";
 
 /**
- * Result type for diary object address retrieval
+ * Result type for journal object address retrieval
  */
-export type DiaryObjectAddressResult = {
+export type JournalObjectAddressResult = {
   address: string | null;
   source: 'graphql' | 'blockchain' | 'not_found';
   error?: string;
 };
 
 /**
- * Get diary object address for a user from GraphQL database
- * This queries the indexed events/data to quickly get the diary object address
+ * Get journal object address for a user from GraphQL database
+ * This queries the indexed events/data to quickly get the journal object address
  * without needing to call the slow blockchain view function
  */
 // Helper function to safely extract address string from any format
@@ -58,35 +58,35 @@ const extractAddressString = (value: any, currentDepth: number = 0, maxDepth: nu
   return null;
 };
 
-export const getDiaryObjectAddressFromGraphQL = async (
+export const getJournalObjectAddressFromGraphQL = async (
   userAddress: string
-): Promise<DiaryObjectAddressResult> => {
+): Promise<JournalObjectAddressResult> => {
   try {
     const query = `
-      query GetDiaryObjectAddress($userAddress: String!) {
-        user_to_diary_object(
+      query GetJournalObjectAddress($userAddress: String!) {
+        user_to_journal_object(
           where: { user_address: { _eq: $userAddress } }
           limit: 1
         ) {
-          user_diary_object_address
+          user_journal_object_address
         }
       }
     `;
 
     const data = await executeQuery<{
-      user_to_diary_object?: Array<{
-        user_diary_object_address: string | { vec?: string[] } | any;
+      user_to_journal_object?: Array<{
+        user_journal_object_address: string | { vec?: string[] } | any;
       }>;
     }>(query, {
       userAddress: userAddress.toLowerCase(),
     });
 
     if (
-      data?.user_to_diary_object &&
-      data.user_to_diary_object.length > 0 &&
-      data.user_to_diary_object[0].user_diary_object_address
+      data?.user_to_journal_object &&
+      data.user_to_journal_object.length > 0 &&
+      data.user_to_journal_object[0].user_journal_object_address
     ) {
-      const addressValue = data.user_to_diary_object[0].user_diary_object_address;
+      const addressValue = data.user_to_journal_object[0].user_journal_object_address;
       const extractedAddress = extractAddressString(addressValue);
       if (extractedAddress) {
         return {
@@ -96,7 +96,7 @@ export const getDiaryObjectAddressFromGraphQL = async (
       }
     }
 
-    // GraphQL query succeeded but no diary found
+    // GraphQL query succeeded but no journal found
     return {
       address: null,
       source: 'not_found',
@@ -104,7 +104,7 @@ export const getDiaryObjectAddressFromGraphQL = async (
   } catch (error: any) {
     // GraphQL query failed due to error (network, auth, etc.)
     const errorMessage = error?.message || String(error);
-    console.error("Error fetching diary object address from GraphQL:", errorMessage);
+    console.error("Error fetching journal object address from GraphQL:", errorMessage);
     return {
       address: null,
       source: 'not_found', // Will trigger blockchain fallback
