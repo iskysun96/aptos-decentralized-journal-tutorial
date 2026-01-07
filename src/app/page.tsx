@@ -14,7 +14,7 @@ import { ConnectWalletDialog } from "@/components/WalletSelector";
 export default function JournalPage() {
   const { account, signAndSubmitTransaction, connected } = useWallet();
   
-  const [diaryMessage, setDiaryMessage] = useState<string>("");
+  const [journalMessage, setJournalMessage] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
 
@@ -24,7 +24,7 @@ export default function JournalPage() {
       return;
     }
 
-    if (!diaryMessage.trim()) {
+    if (!journalMessage.trim()) {
       toast({
         variant: "destructive",
         title: "Error",
@@ -36,7 +36,7 @@ export default function JournalPage() {
     setIsSubmitting(true);
 
     try {
-      const content = diaryMessage.trim();
+      const content = journalMessage.trim();
 
       const committedTransaction = await signAndSubmitTransaction(
         addDailyEntry({
@@ -53,7 +53,7 @@ export default function JournalPage() {
         description: "Your entry has been saved",
       });
 
-      setDiaryMessage("");
+      setJournalMessage("");
     } catch (error: any) {
       console.error("Error submitting journal entry:", error);
       toast({
@@ -95,8 +95,8 @@ export default function JournalPage() {
 
           <div className="mt-2 sm:mt-3 relative rounded-xl border border-zinc-200 bg-white shadow-sm">
             <Textarea
-              value={diaryMessage}
-              onChange={(e) => setDiaryMessage(e.target.value)}
+              value={journalMessage}
+              onChange={(e) => setJournalMessage(e.target.value)}
               placeholder="Write whatever you don't want to lose…"
               className="w-full min-h-[420px] resize-none rounded-xl p-6 pr-16 text-zinc-900 placeholder:text-zinc-400 focus:outline-none text-base leading-relaxed"
               disabled={isSubmitting}
@@ -109,7 +109,7 @@ export default function JournalPage() {
             />
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || !diaryMessage.trim()}
+              disabled={isSubmitting || !journalMessage.trim()}
               size="icon"
               className="absolute bottom-4 right-4 h-10 w-10 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             >
@@ -135,7 +135,7 @@ export default function JournalPage() {
             <span className="hidden sm:inline">
               Stored on Aptos blockchain • Network fee applies
             </span>
-            <span>{diaryMessage.length} characters</span>
+            <span>{journalMessage.length} characters</span>
           </div>
           
           <Dialog open={isWalletDialogOpen} onOpenChange={setIsWalletDialogOpen}>

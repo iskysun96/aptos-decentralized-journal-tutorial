@@ -1,9 +1,9 @@
 import { executeQuery } from "@/utils/graphqlClient";
 
 /**
- * Result type for diary object address retrieval
+ * Result type for journal object address retrieval
  */
-export type DiaryObjectAddressResult = {
+export type JournalObjectAddressResult = {
   address: string | null;
   source: 'graphql' | 'not_found';
 };
@@ -29,47 +29,39 @@ const extractAddressString = (value: any): string | null => {
   return null;
 };
 
-/**
- * Get diary object address for a user from GraphQL database
- * 
- * Aptos Indexer provides a GraphQL API that indexes blockchain data.
- * This is much faster than querying the blockchain directly because:
- * - It's indexed (fast lookups)
- * - It's optimized for queries
- * - It doesn't require blockchain RPC calls
- * 
- * The GraphQL schema includes a `user_to_diary_object` table that maps
- * user addresses to their diary object addresses.
- */
-export const getDiaryObjectAddressFromGraphQL = async (
+//Get journal object address for a user from GraphQL database
+export const getJournalObjectAddressFromGraphQL = async (
   userAddress: string
-): Promise<DiaryObjectAddressResult> => {
+): Promise<JournalObjectAddressResult> => {
   try {
-    // GraphQL query to find the diary object address for this user
+    // GraphQL query to find the journal object address for this user
     const query = `
-      query GetDiaryObjectAddress($userAddress: String!) {
-        user_to_diary_object(
+      query GetJournalObjectAddress($userAddress: String!) {
+        user_to_journal_object(
           where: { user_address: { _eq: $userAddress } }
           limit: 1
         ) {
-          user_diary_object_address
+          user_journal_object_address
         }
       }
     `;
 
+    console.log('query', query);
+
     // Execute the query
     const data = await executeQuery<{
-      user_to_diary_object?: Array<{
-        user_diary_object_address: string | { vec?: string[] };
+      user_to_journal_object?: Array<{
+        user_journal_object_address: string | { vec?: string[] };
       }>;
     }>(query, {
       userAddress: userAddress.toLowerCase(),
     });
+    console.log('data', data);
 
     // Check if we found a result
-    const result = data?.user_to_diary_object?.[0];
-    if (result?.user_diary_object_address) {
-      const address = extractAddressString(result.user_diary_object_address);
+    const result = data?.user_to_journal_object?.[0];
+    if (result?.user_journal_object_address) {
+      const address = extractAddressString(result.user_journal_object_address);
       if (address) {
         return {
           address,
@@ -78,14 +70,14 @@ export const getDiaryObjectAddressFromGraphQL = async (
       }
     }
 
-    // No diary found for this user
+    // No journal found for this user
     return {
       address: null,
       source: 'not_found',
     };
   } catch (error: any) {
     // If GraphQL fails, return not_found (caller can handle fallback)
-    console.error("Error fetching diary object address from GraphQL:", error);
+    console.error("Error fetching journal object address from GraphQL:", error);
     return {
       address: null,
       source: 'not_found',

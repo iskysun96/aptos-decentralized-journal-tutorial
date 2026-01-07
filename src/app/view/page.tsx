@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
 import { aptosClient } from "@/utils/aptosClient";
-import { getDiaryEntries } from "@/view-functions/getDiaryEntries";
+import { getJournalEntries } from "@/view-functions/getJournalEntries";
 import { deleteDailyEntry } from "@/entry-functions/deleteDailyEntry";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -64,10 +64,10 @@ export default function ViewJournalPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const { data: entries, isLoading, refetch } = useQuery({
-    queryKey: ["diary-entries", account?.address?.toString()],
+    queryKey: ["journal-entries", account?.address?.toString()],
     queryFn: async () => {
       if (!account) return [];
-      return await getDiaryEntries(account.address.toString());
+      return await getJournalEntries(account.address.toString());
     },
     enabled: !!account && connected,
   });

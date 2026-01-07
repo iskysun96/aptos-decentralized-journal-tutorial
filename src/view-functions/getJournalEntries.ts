@@ -1,24 +1,16 @@
 import { MODULE_ADDRESS } from "@/constants";
 import { aptosClient } from "@/utils/aptosClient";
-import { getDiaryObjectAddressFromGraphQL } from "./getDiaryObjectAddressFromGraphQL";
+import { getJournalObjectAddressFromGraphQL } from "./getJournalObjectAddressFromGraphQL";
 
 /**
- * Diary entry type matching the Move contract structure
+ * Journal entry type matching the Move contract structure
  */
-export type DiaryEntry = {
+export type JournalEntry = {
   unixTimestamp: number; // Unix timestamp in seconds
   content: string;
 };
 
-/**
- * Step 1: Extract the message content from a DiaryEntry enum
- * 
- * The Move contract defines DiaryEntry as:
- *   enum DiaryEntry { MessageOnly { message: String } }
- * 
- * When serialized from the blockchain, it becomes:
- *   { __variant__: "MessageOnly", message: "..." }
- */
+// Extract the message content from a JournalEntry enum
 const extractMessageFromEntry = (entry: any): string | null => {
   if (entry?.__variant__ === "Leaf" && entry?.value?.message) {
     return entry.value.message;
@@ -27,7 +19,7 @@ const extractMessageFromEntry = (entry: any): string | null => {
 };
 
 /**
- * Step 2: Extract entries from a BPlusTreeMap node
+ * Extract entries from a BPlusTreeMap node
  * 
  * BigOrderedMap uses a B+ tree structure internally. Each node can be:
  * - A leaf node: contains actual key-value pairs (is_leaf: true)
@@ -77,30 +69,30 @@ const extractEntriesFromNode = (
 };
 
 /**
- * Main function: Fetch all diary entries for a user
+ * Main function: Fetch all journal entries for a user
  * 
  * This function:
- * 1. Gets the diary object address (from GraphQL)
- * 2. Queries the Diary resource from that object address
+ * 1. Gets the journal object address (from GraphQL)
+ * 2. Queries the Journal resource from that object address
  * 3. Extracts entries from the BigOrderedMap (B+ tree structure)
- * 4. Converts entries to DiaryEntry format
+ * 4. Converts entries to JournalEntry format
  * 5. Sorts by timestamp (newest first)
  */
-export const getDiaryEntries = async (userAddress: string): Promise<DiaryEntry[]> => {
+export const getJournalEntries = async (userAddress: string): Promise<JournalEntry[]> => {
   try {
-    // Step 1: Get the diary object address
-    const addressResult = await getDiaryObjectAddressFromGraphQL(userAddress);
+    // Get the journal object address
+    const addressResult = await getJournalObjectAddressFromGraphQL(userAddress);
     
     if (!addressResult.address) {
-      return []; // No diary exists for this user
+      return []; // No journal exists for this user
     }
 
-    // Step 2: Query the Diary resource from the object address
+    // Query the Journal resource from the object address
     if (!MODULE_ADDRESS) {
       throw new Error("MODULE_ADDRESS is not defined");
     }
 
-    const resourceType = `${MODULE_ADDRESS}::permanent_diary::Diary` as const;
+    const resourceType = `${MODULE_ADDRESS}::decentralized_journal::Journal` as const;
     const resource = await aptosClient().getAccountResource({
       accountAddress: addressResult.address,
       resourceType,
@@ -108,35 +100,35 @@ export const getDiaryEntries = async (userAddress: string): Promise<DiaryEntry[]
 
     if (!resource?.daily_entries?.root) {
       console.log("No daily entries found");
-      return []; // Diary exists but has no entries
+      return []; // Journal exists but has no entries
     }
 
-    // Step 3: Extract entries from the BigOrderedMap (B+ tree structure)
+    // Extract entries from the BigOrderedMap (B+ tree structure)
     // The daily_entries is a BigOrderedMap, which uses a B+ tree internally
     const parsedEntries = extractEntriesFromNode(resource.daily_entries.root);
-    // Step 4: Convert to DiaryEntry format
-    const diaryEntries: DiaryEntry[] = [];
+    // Convert to JournalEntry format
+    const journalEntries: JournalEntry[] = [];
     for (const { key, value } of parsedEntries) {
       const message = extractMessageFromEntry(value);
       if (message !== null) {
-        diaryEntries.push({
+        journalEntries.push({
           unixTimestamp: key,
           content: message,
         });
       }
     }
 
-    // Step 5: Sort by timestamp (newest first)
-    diaryEntries.sort((a, b) => b.unixTimestamp - a.unixTimestamp);
+    // Sort by timestamp (newest first)
+    journalEntries.sort((a, b) => b.unixTimestamp - a.unixTimestamp);
 
-    console.log("Diary entries:", diaryEntries);
-    return diaryEntries;
+    console.log("Journal entries:", journalEntries);
+    return journalEntries;
   } catch (error: any) {
     // Handle case where resource doesn't exist
     if (error?.status === 404 || error?.message?.includes("not found")) {
       return [];
     }
-    console.error("Error fetching diary entries:", error);
+    console.error("Error fetching journal entries:", error);
     throw error;
   }
 };
