@@ -1,17 +1,16 @@
 # Decentralized Journal Tutorial Template
 
-A starter template for building a decentralized journal application on Aptos. This template includes all the UI components and styling, but the smart contract and blockchain integration logic are left for you to implement while following along with the tutorial video.
+A starter template for building a decentralized journal application on Aptos. By completing this tutorial you will learn:
+1. Writing & testing Move smart contract
+2. Integrating frontend to the Aptos blockchain and your smart contract
+3. Using Geomi's No Code Indexer to set up a graphQL database 
+
+In other words, this is the ultimate tutorial on how to build a fullstack decentralized application on the Aptos blockchain.
+
+This template includes all the UI components and styling, but the smart contract and blockchain integration logic are left for you to implement while following along with the tutorial video.
 
 ## 📺 Tutorial Video
-
-Follow along with the tutorial video to learn how to:
-- Build and publish a Move smart contract on Aptos
-- Implement entry functions for adding and deleting journal entries
-- Create view functions to query blockchain data
-- Integrate wallet connection and transaction submission
-- Build a complete full-stack decentralized application
-
-**[Link to tutorial video will be added here]**
+Watch here -> **[Link to tutorial video will be added here]**
 
 ## 🚀 Getting Started
 
@@ -19,17 +18,17 @@ Follow along with the tutorial video to learn how to:
 
 - Node.js (v18 or higher)
 - npm or pnpm
-- An Aptos wallet (Petra, Pontem, or other compatible wallet)
-- Aptos CLI (optional, for contract development)
+- An Aptos wallet (Aptos Connect, [Petra](https://petra.app/), or other compatible wallet)
+- [Aptos CLI](https://aptos.dev/build/cli)
 
-### Clone the Repository
+### 1. Clone the Repository
 
 ```bash
 git clone <repository-url>
 cd aptos-decentralized-journal-tutorial
 ```
 
-### Install Dependencies
+### 2. Install Dependencies
 
 ```bash
 npm install
@@ -37,13 +36,13 @@ npm install
 pnpm install
 ```
 
-### Set Up Environment Variables
+### 3. Set Up Environment Variables
 
 1. Initialize an Aptos account
 ```bash
 aptos init
 ```
-Choose `devnet` to begin with. This step will create a folder named `.aptos` which holds the initialized account info in the `config.yaml` file.
+Choose `testnet`. This step will create a folder named `.aptos` which holds the initialized account info in the `config.yaml` file.
 
 2. Copy the example environment file:
 ```bash
@@ -53,11 +52,8 @@ cp .env.example .env
 3. Open `.env` and configure the following variables:
 
 ```env
-# Network: "devnet", "testnet" or "mainnet"
+# Network: "testnet" or "mainnet"
 NEXT_PUBLIC_APP_NETWORK=testnet
-
-# Module Address: Set this after publishing your smart contract
-NEXT_PUBLIC_MODULE_ADDRESS=
 
 # Copy over the address from the `./aptos/config.yaml` file
 NEXT_MODULE_PUBLISHER_ACCOUNT_ADDRESS=
@@ -66,17 +62,8 @@ NEXT_MODULE_PUBLISHER_ACCOUNT_ADDRESS=
 # Copy over the address from the `./aptos/config.yaml` file
 NEXT_MODULE_PUBLISHER_ACCOUNT_PRIVATE_KEY=
 
-# Aptos API Key (Optional): Get from https://build.aptoslabs.com/
+# Aptos API Key: Get from Geomi (https://geomi.dev/)
 NEXT_PUBLIC_APTOS_API_KEY=
-
-# GraphQL Endpoint (Optional): For faster data queries
-NEXT_PUBLIC_GRAPHQL_ENDPOINT=
-
-# GraphQL API Key (Optional)
-NEXT_PUBLIC_GRAPHQL_API_KEY=
-```
-
-**Note:** You'll fill in `NEXT_PUBLIC_MODULE_ADDRESS` after publishing your smart contract during the tutorial.
 
 ### Run the Development Server
 
@@ -167,20 +154,11 @@ As you follow along with the tutorial video, you'll complete:
 ## 📖 Resources
 
 - [Aptos Documentation](https://aptos.dev/)
-- [Move Language Documentation](https://move-language.github.io/move/)
-- [Aptos TypeScript SDK](https://aptos-labs.github.io/ts-sdk-doc/)
+- [Move Language Documentation](https://aptos.dev/build/smart-contracts)
+- [Aptos TypeScript SDK](https://github.com/aptos-labs/aptos-ts-sdk)
 - [Aptos Wallet Adapter](https://github.com/aptos-labs/aptos-wallet-adapter)
-- [Aptos Build](https://build.aptoslabs.com/) - Get API keys
-
-## 🤝 Following Along
-
-1. **Clone the repository** (you're here!)
-2. **Install dependencies** using `npm install` or `pnpm install`
-3. **Set up environment variables** by copying `.env.example` to `.env`
-4. **Start the dev server** with `npm run dev`
-5. **Open the tutorial video** and follow along step by step
-6. **Implement the TODO items** as shown in the video
-7. **Test your implementation** after each step
+- [Geomi](https://geomi.dev/)
+- [Aptos Developers YouTube](https://www.youtube.com/@aptosdev)
 
 ## 💡 Tips
 
@@ -189,11 +167,3 @@ As you follow along with the tutorial video, you'll complete:
 - Use the Aptos testnet for development (it's free!)
 - Keep your `.env` file secure and never commit it to version control
 - Test your contract thoroughly before deploying to mainnet
-
-## 📄 License
-
-[Add your license information here]
-
----
-
-**Happy Building! 🚀**
