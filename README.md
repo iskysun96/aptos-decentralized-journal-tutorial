@@ -75,23 +75,6 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
-## 📚 What You'll Build
-
-During the tutorial, you'll implement:
-
-### Smart Contract (Move)
-- Struct definitions for journal entries
-- Entry functions: `add_daily_entry`, `delete_daily_entry_by_unixtimestamp`
-- View functions: `get_journal_object_address`, `get_journal_content_by_date`
-- Helper functions and error handling
-
-### Frontend
-- Wallet connection integration
-- Transaction submission for adding entries
-- Transaction submission for deleting entries
-- Blockchain data queries to fetch journal entries
-- GraphQL integration (optional, for performance)
-
 ## 🏗️ Project Structure
 
 ```
