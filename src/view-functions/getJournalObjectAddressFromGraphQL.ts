@@ -8,27 +8,6 @@ export type JournalObjectAddressResult = {
   source: 'graphql' | 'not_found';
 };
 
-/**
- * Helper function to extract address string from GraphQL response
- * 
- * GraphQL may return the address in different formats:
- * - Direct string: "0x123..."
- * - Wrapped in vec: { vec: ["0x123..."] }
- */
-const extractAddressString = (value: any): string | null => {
-  // If it's already a string, return it
-  if (typeof value === 'string') {
-    return value;
-  }
-  
-  // If it's wrapped in a vec array, get the first element
-  if (value?.vec && Array.isArray(value.vec) && value.vec.length > 0) {
-    return String(value.vec[0]);
-  }
-  
-  return null;
-};
-
 //Get journal object address for a user from GraphQL database
 export const getJournalObjectAddressFromGraphQL = async (
   userAddress: string
@@ -50,7 +29,7 @@ export const getJournalObjectAddressFromGraphQL = async (
     // Execute the query
     const data = await executeQuery<{
       user_to_journal_object?: Array<{
-        user_journal_object_address: string | { vec?: string[] };
+        user_journal_object_address: string
       }>;
     }>(query, {
       userAddress: userAddress.toLowerCase(),
@@ -59,13 +38,10 @@ export const getJournalObjectAddressFromGraphQL = async (
     // Check if we found a result
     const result = data?.user_to_journal_object?.[0];
     if (result?.user_journal_object_address) {
-      const address = extractAddressString(result.user_journal_object_address);
-      if (address) {
-        return {
-          address,
-          source: 'graphql',
-        };
-      }
+      return {
+        address: result.user_journal_object_address,
+        source: 'graphql',
+      };
     }
 
     // No journal found for this user
