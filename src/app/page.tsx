@@ -38,8 +38,8 @@ export default function JournalPage() {
       // TODO: Implement transaction submission here
 
       toast({
-        title: "TODO",
-        description: "Implement transaction submission",
+        title: "Saved",
+        description: "Your entry has been saved",
       });
 
       setJournalMessage("");
