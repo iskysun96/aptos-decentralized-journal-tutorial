@@ -9,7 +9,7 @@ export const addDailyEntry = (args: AddDailyEntryArguments): InputTransactionDat
   const { content } = args;
   return {
     data: {
-      function: `${MODULE_ADDRESS}::decentralized_journal::add_daily_entry`,
+      function: `${MODULE_ADDRESS}::decentralized_journal::add_journal_entry`,
       functionArguments: [content],
     },
   };

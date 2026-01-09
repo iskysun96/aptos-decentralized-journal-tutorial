@@ -92,7 +92,7 @@ export const getJournalEntries = async (userAddress: string): Promise<JournalEnt
       throw new Error("MODULE_ADDRESS is not defined");
     }
 
-    const resourceType = `${MODULE_ADDRESS}::decentralized_journal::Journal` as const;
+    const resourceType = `${MODULE_ADDRESS}::decentralized_journal::UserJournalObject` as const;
     const resource = await aptosClient().getAccountResource({
       accountAddress: addressResult.address,
       resourceType,

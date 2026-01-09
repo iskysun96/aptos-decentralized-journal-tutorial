@@ -33,6 +33,7 @@ const extractAddressString = (value: any): string | null => {
 export const getJournalObjectAddressFromGraphQL = async (
   userAddress: string
 ): Promise<JournalObjectAddressResult> => {
+  console.log('userAddress', userAddress);
   try {
     // GraphQL query to find the journal object address for this user
     const query = `

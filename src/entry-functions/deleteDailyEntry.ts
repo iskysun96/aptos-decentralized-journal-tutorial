@@ -19,7 +19,7 @@ export const deleteDailyEntry = (args: DeleteDailyEntryArguments): InputTransact
   
   return {
     data: {
-      function: `${MODULE_ADDRESS}::decentralized_journal::delete_daily_entry_by_unixtimestamp`,
+      function: `${MODULE_ADDRESS}::decentralized_journal::delete_journal_entry_by_unixtimestamp`,
       functionArguments: [unixTimestamp],
     },
   };
