@@ -12,6 +12,6 @@ if (!GRAPHQL_API_KEY) {
 // TODO: Create GraphQL client with authentication
 
 
-// TODO: Execute a GraphQL query
+// TODO: Create a function to execute a GraphQL query
 
 
