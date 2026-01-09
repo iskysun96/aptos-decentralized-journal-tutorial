@@ -18,8 +18,6 @@ export default function JournalPage() {
   const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
 
   const handleSubmit = async () => {
-    // TODO: Implement wallet adapter setup here
-    
     if (!account || !connected) {
       setIsWalletDialogOpen(true);
       return;
