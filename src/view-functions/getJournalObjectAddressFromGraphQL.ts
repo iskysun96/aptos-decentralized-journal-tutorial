@@ -47,8 +47,6 @@ export const getJournalObjectAddressFromGraphQL = async (
       }
     `;
 
-    console.log('query', query);
-
     // Execute the query
     const data = await executeQuery<{
       user_to_journal_object?: Array<{
@@ -57,7 +55,6 @@ export const getJournalObjectAddressFromGraphQL = async (
     }>(query, {
       userAddress: userAddress.toLowerCase(),
     });
-    console.log('data', data);
 
     // Check if we found a result
     const result = data?.user_to_journal_object?.[0];
