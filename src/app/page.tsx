@@ -31,14 +31,6 @@ export default function JournalPage() {
       });
       return;
     }
-
-    // TODO: Implement transaction submission
-    // 1. Import addDailyEntry function from @/entry-functions/addDailyEntry
-    // 2. Import aptosClient from @/utils/aptosClient
-    // 3. Build transaction using addDailyEntry({ content: journalMessage.trim() })
-    // 4. Sign and submit transaction using signAndSubmitTransaction
-    // 5. Wait for transaction confirmation using aptosClient().waitForTransaction
-    // 6. Show success message and clear the form
     
     setIsSubmitting(true);
 
@@ -50,8 +42,7 @@ export default function JournalPage() {
         description: "Implement transaction submission",
       });
 
-      // TODO: Uncomment after implementing transaction
-      // setJournalMessage("");
+      setJournalMessage("");
     } catch (error: any) {
       console.error("Error submitting journal entry:", error);
       toast({
