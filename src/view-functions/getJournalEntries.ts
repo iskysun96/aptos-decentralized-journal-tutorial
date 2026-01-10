@@ -21,8 +21,6 @@ const extractMessageFromEntry = (entry: any): string | null => {
  * For small maps (< 40 entries), the root is also a leaf node.
  * For larger maps, we need to recursively traverse internal nodes.
  */
-
-
 const extractEntriesFromNode = (
   node: any,
   depth: number = 0,
