@@ -109,26 +109,19 @@ export default function ViewJournalPage() {
       return;
     }
 
-    // TODO: Implement deletion
-    // 1. Import deleteDailyEntry from @/entry-functions/deleteDailyEntry
-    // 2. Import aptosClient from @/utils/aptosClient
-    // 3. Build transaction using deleteDailyEntry({ unixTimestamp })
-    // 4. Sign and submit transaction using signAndSubmitTransaction
-    // 5. Wait for transaction confirmation using aptosClient().waitForTransaction
-    // 6. Show success message and refetch entries
+
 
     setDeletingTimestamps((prev) => new Set(prev).add(unixTimestamp));
 
     try {
-      // TODO: Implement deletion here
+      // TODO: Implement deleting journal entry here
 
       toast({
         title: "TODO",
         description: "Implement deletion",
       });
 
-      // TODO: Uncomment after implementing deletion
-      // await refetch();
+      await refetch();
     } catch (error: any) {
       console.error("Error deleting journal entry:", error);
       toast({
