@@ -43,7 +43,7 @@ const extractEntriesFromNode = (
   // Leaf node: extract entries directly
   if (node.is_leaf === true && node.children?.entries) {
     for (const entry of node.children.entries) {
-      if (entry?.key !== undefined && entry?.value !== undefined) {
+      if (entry?.key && entry?.value) {
         const key = typeof entry.key === "string" 
           ? parseInt(entry.key, 10) 
           : Number(entry.key);
