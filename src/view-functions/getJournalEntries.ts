@@ -30,6 +30,16 @@ const extractEntriesFromNode = (
   throw new Error("Not implemented yet");
 };
 
+/**
+ * Main function: Fetch all journal entries for a user
+ * 
+ * This function:
+ * 1. Gets the journal object address (from GraphQL)
+ * 2. Queries the Journal resource from that object address
+ * 3. Extracts entries from the BigOrderedMap (B+ tree structure)
+ * 4. Converts entries to JournalEntry format
+ * 5. Sorts by timestamp (newest first)
+ */
 export const getJournalEntries = async (userAddress: string): Promise<JournalEntry[]> => {
   // TODO: Implement this function
   // Query the blockchain to get journal entries for the user
