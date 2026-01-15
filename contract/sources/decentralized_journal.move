@@ -24,12 +24,12 @@ module decentralized_journal_addr::decentralized_journal {
 
     /// Individual user journal containing daily entries
     /// Entries are stored by unix timestamp (seconds)
-    struct UserJournalObject has key {
+    struct UserJournalEntries has key {
         daily_entries: BigOrderedMap<u64, JournalEntry>,
     }
 
     /// Controller for individual journal objects, provides extend_ref for extending the object
-    struct UserJournalObjectController has key {
+    struct UserJournalController has key {
         extend_ref: ExtendRef,
     }
 
@@ -92,7 +92,7 @@ module decentralized_journal_addr::decentralized_journal {
     entry public fun add_journal_entry(
         sender: &signer,
         content: String,
-    ) acquires UserJournalObject, JournalsRegistry {
+    ) acquires UserJournalEntries, JournalsRegistry {
         // Validate content length
         let content_length = content.length();
         if (content_length > MAX_CONTENT_LENGTH) {
@@ -109,7 +109,7 @@ module decentralized_journal_addr::decentralized_journal {
 
         let journals_reg = borrow_global_mut<JournalsRegistry>(journals_reg_obj_addr);
         let user_journal_object_address = journals_reg.all_journals.borrow(&sender_address);
-        let user_journal_object = borrow_global_mut<UserJournalObject>(*user_journal_object_address);
+        let user_journal_object = borrow_global_mut<UserJournalEntries>(*user_journal_object_address);
         let journal_entry = JournalEntry::MessageOnly { message: content };
 
         let now_seconds = timestamp::now_seconds();
@@ -128,7 +128,7 @@ module decentralized_journal_addr::decentralized_journal {
     /// 
     /// Args:
     ///   - unix_timestamp: Unix timestamp (in seconds) of the entry to delete
-    entry public fun delete_journal_entry_by_unixtimestamp(sender: &signer, unix_timestamp: u64) acquires UserJournalObject, JournalsRegistry {
+    entry public fun delete_journal_entry_by_unixtimestamp(sender: &signer, unix_timestamp: u64) acquires UserJournalEntries, JournalsRegistry {
         let sender_address = signer::address_of(sender);
         let journals_reg_obj_addr = get_journals_reg_obj_address();
         
@@ -137,7 +137,7 @@ module decentralized_journal_addr::decentralized_journal {
 
         let journals_reg = borrow_global_mut<JournalsRegistry>(journals_reg_obj_addr);
         let user_journal_object_address = journals_reg.all_journals.borrow(&sender_address);
-        let user_journal_object = borrow_global_mut<UserJournalObject>(*user_journal_object_address);
+        let user_journal_object = borrow_global_mut<UserJournalEntries>(*user_journal_object_address);
 
         // Check if entry exists before deletion
         assert!(user_journal_object.daily_entries.contains(&unix_timestamp), E_JOURNAL_ENTRY_NOT_FOUND);
@@ -169,7 +169,7 @@ module decentralized_journal_addr::decentralized_journal {
     }
 
     #[view]
-    public fun get_journal_entry_by_date(user_address: address, date: u64): Option<String> acquires UserJournalObject, JournalsRegistry {
+    public fun get_journal_entry_by_date(user_address: address, date: u64): Option<String> acquires UserJournalEntries, JournalsRegistry {
         let journals_reg_obj_addr = get_journals_reg_obj_address();
         let journals_reg = borrow_global<JournalsRegistry>(journals_reg_obj_addr);
         let all_journals = &journals_reg.all_journals;
@@ -182,7 +182,7 @@ module decentralized_journal_addr::decentralized_journal {
         let user_journal_object_address = all_journals.borrow(&user_address);
 
         // Get the journal and return the content
-        let user_journal_object = borrow_global<UserJournalObject>(*user_journal_object_address);
+        let user_journal_object = borrow_global<UserJournalEntries>(*user_journal_object_address);
         if (user_journal_object.daily_entries.contains(&date)) {
             let journal_entry = *user_journal_object.daily_entries.borrow(&date);
             // Extract message from enum variant
@@ -209,12 +209,12 @@ module decentralized_journal_addr::decentralized_journal {
         let user_journal_object_address = signer::address_of(&journal_signer);
         
         // Create the Journal resource
-        move_to(&journal_signer, UserJournalObject {
+        move_to(&journal_signer, UserJournalEntries {
             daily_entries: big_ordered_map::new_with_config(0, 0, false),
         });
 
-        // Create the UserJournalObjectController for extending the object
-        move_to(&journal_signer, UserJournalObjectController {
+        // Create the UserJournalController for extending the object
+        move_to(&journal_signer, UserJournalController {
             extend_ref: object::generate_extend_ref(journal_constructor_ref),
         });
 
@@ -252,7 +252,7 @@ module decentralized_journal_addr::decentralized_journal {
         sender: &signer,
         date: u64,
         content: String,
-    ) acquires UserJournalObject, JournalsRegistry {
+    ) acquires UserJournalEntries, JournalsRegistry {
         // Validate content length
         let content_length = content.length();
         if (content_length > MAX_CONTENT_LENGTH) {
@@ -270,7 +270,7 @@ module decentralized_journal_addr::decentralized_journal {
         // Get the journal and add the entry
         let journals_reg = borrow_global_mut<JournalsRegistry>(journals_reg_obj_addr);
         let journal_addr = journals_reg.all_journals.borrow(&sender_address);
-        let user_journal_object = borrow_global_mut<UserJournalObject>(*journal_addr);
+        let user_journal_object = borrow_global_mut<UserJournalEntries>(*journal_addr);
         let journal_entry = JournalEntry::MessageOnly { message: content };
         user_journal_object.daily_entries.add(date, journal_entry);
 
